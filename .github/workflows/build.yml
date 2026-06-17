@@ -24,9 +24,12 @@ jobs:
       - name: Get Dependencies
         run: flutter pub get
 
-      # 🌟 यह रहा वो एकदम सही जादुई जुगाड़ जो इस एरर को उड़ा देगा 🌟
-      - name: Fix InAppWebView Proguard Error
-        run: sed -i "s/proguard-android.txt/proguard-android-optimize.txt/g" /home/runner/.pub-cache/hosted/pub.dev/flutter_inappwebview-*/android/build.gradle
+      # 🌟 THE SOLID CURE: यह कोड एंड्रॉइड की सारी सख्तियों को बायपास कर देगा 🌟
+      - name: The Solid Cure (Fix Old Package Errors)
+        run: |
+          GRADLE_FILE=$(ls /home/runner/.pub-cache/hosted/pub.dev/flutter_inappwebview-*/android/build.gradle | head -n 1)
+          sed -i 's/proguard-android.txt/proguard-android-optimize.txt/g' $GRADLE_FILE
+          sed -i 's/android {/android {\n    namespace "com.pichillilorenzo.flutter_inappwebview"/g' $GRADLE_FILE
 
       - name: Build APK
         run: flutter build apk --release
