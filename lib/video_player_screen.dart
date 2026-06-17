@@ -10,7 +10,6 @@ class VideoPlayerScreen extends StatefulWidget {
 
   const VideoPlayerScreen({super.key, required this.videoId, required this.title});
 
-  // 🌟 पूरे ऐप में कहीं से भी वीडियो चलाने का जादुई स्टेटिक फंक्शन 🌟
   static OverlayEntry? _overlayEntry;
   static final ValueNotifier<Map<String, String>?> currentVideo = ValueNotifier<Map<String, String>?>(null);
   static final ValueNotifier<bool> isMinimized = ValueNotifier<bool>(false);
@@ -20,9 +19,7 @@ class VideoPlayerScreen extends StatefulWidget {
     isMinimized.value = false;
 
     if (_overlayEntry == null) {
-      _overlayEntry = OverlayEntry(
-        builder: (context) => const GlobalVideoPlayerOverlay(),
-      );
+      _overlayEntry = OverlayEntry(builder: (context) => const GlobalVideoPlayerOverlay());
       Overlay.of(context).insert(_overlayEntry!);
     }
   }
@@ -39,12 +36,9 @@ class VideoPlayerScreen extends StatefulWidget {
 
 class _VideoPlayerScreenState extends State<VideoPlayerScreen> {
   @override
-  Widget build(BuildContext context) {
-    return const SizedBox.shrink(); // इसकी अब सीधे ज़रूरत नहीं है
-  }
+  Widget build(BuildContext context) => const SizedBox.shrink();
 }
 
-// 🎥 असली ओवरले विजेट जो बैकग्राउंड में हमेशा जिंदा रहेगा
 class GlobalVideoPlayerOverlay extends StatefulWidget {
   const GlobalVideoPlayerOverlay({super.key});
 
@@ -77,7 +71,6 @@ class _GlobalVideoPlayerOverlayState extends State<GlobalVideoPlayerOverlay> {
     super.dispose();
   }
 
-  // जब भी कोई नई वीडियो क्लिक होगी, ये फंक्शन उसे बिना रुके लोड कर देगा
   void _onVideoChanged() {
     final videoData = VideoPlayerScreen.currentVideo.value;
     if (videoData == null) return;
@@ -97,9 +90,10 @@ class _GlobalVideoPlayerOverlayState extends State<GlobalVideoPlayerOverlay> {
       if (_controller == null) {
         _controller = YoutubePlayerController(
           initialVideoId: currentVideoId,
-          flags: const YoutubePlayerFlags(autoPlay: true, mute: false),
+          // 🌟 forceHD: false करने से प्लेयर कभी 00:00 पर नहीं अटकेगा 🌟
+          flags: const YoutubePlayerFlags(autoPlay: true, mute: false, forceHD: false),
         )..addListener(() {
-            if (mounted) setState(() {}); // प्ले-पॉज बटन को अपडेट रखने के लिए
+            if (mounted) setState(() {});
           });
       } else {
         _controller!.load(currentVideoId);
@@ -181,116 +175,130 @@ class _GlobalVideoPlayerOverlayState extends State<GlobalVideoPlayerOverlay> {
         return AnimatedPositioned(
           duration: const Duration(milliseconds: 250),
           curve: Curves.easeInOut,
-          top: minimized ? screenHeight - 135 : 0, // बॉटम नेविगेशन बार के ठीक ऊपर सेट करने के लिए
-          left: 0,
-          right: 0,
+          top: minimized ? screenHeight - 135 : 0, 
+          left: 0, right: 0,
           bottom: minimized ? 65 : 0, 
           child: Material(
             color: const Color(0xFF0F0F0F),
             elevation: 10,
-            child: minimized 
-                ? _buildMinimizedLayout(screenWidth)
-                : _buildMaximizedLayout(screenWidth),
+            child: Stack(
+              children: [
+                // 🌟 1. मैक्सिमाइज़्ड मोड: नीचे की रिलेटेड वीडियोज़ 🌟
+                if (!minimized)
+                  Positioned(
+                    top: 220, left: 0, right: 0, bottom: 0,
+                    child: _buildRelatedVideosList(),
+                  ),
+
+                // 🌟 2. मिनिमाइज़्ड मोड: साइड में प्ले/पॉज़ कंट्रोल्स 🌟
+                if (minimized)
+                  Positioned(
+                    top: 0, left: 120, right: 0, bottom: 0,
+                    child: _buildMiniplayerControls(),
+                  ),
+
+                // 🌟 3. असली वेबव्यू प्लेयर (यह कभी डिस्ट्रॉय नहीं होगा, सिर्फ साइज़ बदलेगा) 🌟
+                Positioned(
+                  top: 0, left: 0,
+                  child: GestureDetector(
+                    onTap: minimized ? () => VideoPlayerScreen.isMinimized.value = false : null,
+                    child: AnimatedContainer(
+                      duration: const Duration(milliseconds: 250),
+                      curve: Curves.easeInOut,
+                      width: minimized ? 120 : screenWidth,
+                      height: minimized ? 70 : 220,
+                      color: Colors.black,
+                      child: _controller != null 
+                          ? YoutubePlayer(
+                              controller: _controller!, 
+                              showVideoProgressIndicator: !minimized, 
+                              progressIndicatorColor: Colors.red,
+                            )
+                          : const Center(child: CircularProgressIndicator(color: Colors.red)),
+                    ),
+                  ),
+                ),
+
+                // 🌟 4. मैक्सिमाइज़्ड मोड: प्लेयर को नीचे करने वाला एरो 🌟
+                if (!minimized)
+                  Positioned(
+                    top: 35, left: 10,
+                    child: IconButton(
+                      icon: const Icon(Icons.keyboard_arrow_down, color: Colors.white, size: 35),
+                      onPressed: () => VideoPlayerScreen.isMinimized.value = true,
+                    ),
+                  ),
+              ],
+            ),
           ),
         );
       },
     );
   }
 
-  // 📱 1. छोटा मिनीप्लेयर डिजाइन (YouTube जैसा पट्टी वाला लुक)
-  Widget _buildMinimizedLayout(double screenWidth) {
+  Widget _buildRelatedVideosList() {
+    return isLoading 
+        ? const Center(child: CircularProgressIndicator(color: Colors.red))
+        : NotificationListener<ScrollNotification>(
+            onNotification: (ScrollNotification scrollInfo) {
+              if (!isLoadingMore && scrollInfo.metrics.pixels >= scrollInfo.metrics.maxScrollExtent - 200) {
+                _loadRelatedVideos();
+              }
+              return false;
+            },
+            child: ListView.builder(
+              padding: EdgeInsets.zero,
+              itemCount: relatedVideos.length + 1 + (nextPageToken != null ? 1 : 0),
+              itemBuilder: (context, index) {
+                if (index == 0) {
+                  return Padding(
+                    padding: const EdgeInsets.all(16.0),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(currentTitle, style: const TextStyle(color: Colors.white, fontSize: 16, fontWeight: FontWeight.bold)),
+                        const SizedBox(height: 16),
+                        const Divider(color: Colors.grey, height: 0.5),
+                        const SizedBox(height: 16),
+                        const Text("मिलती-जुलती वीडियोज़", style: TextStyle(color: Colors.white, fontSize: 14, fontWeight: FontWeight.bold)),
+                      ],
+                    ),
+                  );
+                }
+                int videoIndex = index - 1;
+                if (videoIndex == relatedVideos.length) {
+                  return const Padding(padding: EdgeInsets.all(20.0), child: Center(child: CircularProgressIndicator(color: Colors.red)));
+                }
+                return _buildRelatedVideoCard(relatedVideos[videoIndex]);
+              },
+            ),
+          );
+  }
+
+  Widget _buildMiniplayerControls() {
     return Container(
       color: const Color(0xFF1F1F1F),
+      padding: const EdgeInsets.symmetric(horizontal: 8),
       child: Row(
         children: [
-          SizedBox(
-            width: 120,
-            height: 70,
-            child: _controller != null 
-                ? YoutubePlayer(controller: _controller!, topActions: const [], bottomActions: const []) 
-                : Container(color: Colors.black),
-          ),
-          const SizedBox(width: 8),
           Expanded(
             child: GestureDetector(
-              onTap: () => VideoPlayerScreen.isMinimized.value = false, // टैप करते ही बड़ा हो जाएगा
+              onTap: () => VideoPlayerScreen.isMinimized.value = false,
               child: Text(currentTitle, style: const TextStyle(color: Colors.white, fontSize: 13, fontWeight: FontWeight.w500), maxLines: 1, overflow: TextOverflow.ellipsis),
             ),
           ),
           IconButton(
             icon: Icon(_controller?.value.isPlaying == true ? Icons.pause : Icons.play_arrow, color: Colors.white),
             onPressed: () {
-              _controller?.value.isPlaying == true ? _controller!.pause() : _controller!.play();
-              setState(() {});
+              if (_controller != null) {
+                _controller!.value.isPlaying ? _controller!.pause() : _controller!.play();
+                setState(() {});
+              }
             },
           ),
           IconButton(
             icon: const Icon(Icons.close, color: Colors.white),
-            onPressed: () => VideoPlayerScreen.close(), // प्लेयर बंद करने के लिए
-          ),
-        ],
-      ),
-    );
-  }
-
-  // 📱 2. बड़ा फुलस्क्रीन प्लेयर डिजाइन (ऊपर पिन वीडियो, नीचे इनफिनिट स्क्रॉल)
-  Widget _buildMaximizedLayout(double screenWidth) {
-    return SafeArea(
-      child: Column(
-        children: [
-          Row(
-            children: [
-              IconButton(
-                icon: const Icon(Icons.keyboard_arrow_down, color: Colors.white, size: 30),
-                onPressed: () => VideoPlayerScreen.isMinimized.value = true, // दबाते ही छोटा हो जाएगा
-              ),
-              const Spacer(),
-            ],
-          ),
-          SizedBox(
-            width: screenWidth,
-            height: 220,
-            child: _controller != null 
-                ? YoutubePlayer(controller: _controller!, showVideoProgressIndicator: true, progressIndicatorColor: Colors.red)
-                : const Center(child: CircularProgressIndicator(color: Colors.red)),
-          ),
-          Expanded(
-            child: isLoading 
-                ? const Center(child: CircularProgressIndicator(color: Colors.red))
-                : NotificationListener<ScrollNotification>(
-                    onNotification: (ScrollNotification scrollInfo) {
-                      if (!isLoadingMore && scrollInfo.metrics.pixels >= scrollInfo.metrics.maxScrollExtent - 200) {
-                        _loadRelatedVideos();
-                      }
-                      return false;
-                    },
-                    child: ListView.builder(
-                      itemCount: relatedVideos.length + 1 + (nextPageToken != null ? 1 : 0),
-                      itemBuilder: (context, index) {
-                        if (index == 0) {
-                          return Padding(
-                            padding: const EdgeInsets.all(16.0),
-                            child: Column(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: [
-                                Text(currentTitle, style: const TextStyle(color: Colors.white, fontSize: 16, fontWeight: FontWeight.bold)),
-                                const SizedBox(height: 16),
-                                const Divider(color: Colors.grey, height: 0.5),
-                                const SizedBox(height: 16),
-                                const Text("मिलती-जुलती वीडियोज़", style: TextStyle(color: Colors.white, fontSize: 14, fontWeight: FontWeight.bold)),
-                              ],
-                            ),
-                          );
-                        }
-                        int videoIndex = index - 1;
-                        if (videoIndex == relatedVideos.length) {
-                          return const Padding(padding: EdgeInsets.all(20.0), child: Center(child: CircularProgressIndicator(color: Colors.red)));
-                        }
-                        final video = relatedVideos[videoIndex];
-                        return _buildRelatedVideoCard(video);
-                      },
-                    ),
-                  ),
+            onPressed: () => VideoPlayerScreen.close(),
           ),
         ],
       ),
@@ -299,9 +307,7 @@ class _GlobalVideoPlayerOverlayState extends State<GlobalVideoPlayerOverlay> {
 
   Widget _buildRelatedVideoCard(Map<String, dynamic> video) {
     return InkWell(
-      onTap: () {
-        VideoPlayerScreen.currentVideo.value = {'id': video['id'], 'title': video['title']};
-      },
+      onTap: () => VideoPlayerScreen.currentVideo.value = {'id': video['id'], 'title': video['title']},
       child: Padding(
         padding: const EdgeInsets.symmetric(horizontal: 12.0, vertical: 8.0),
         child: Row(
