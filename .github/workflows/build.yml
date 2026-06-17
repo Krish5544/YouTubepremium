@@ -11,15 +11,18 @@ jobs:
           
       - run: flutter create --project-name protube_app . 
       
-      # 🌐 निंजा तकनीक 1: इंटरनेट परमिशन
+      # 🌐 निंजा तकनीक: इंटरनेट परमिशन
       - run: sed -i 's/<application/<uses-permission android:name="android.permission.INTERNET"\/>\n    <application/g' android/app/src/main/AndroidManifest.xml
 
-      # 🚀 अल्टीमेट निंजा तकनीक 2.0: API 36 फिक्स (लेटेस्ट पैकेजेस के लिए)
-      - run: find android/app -type f -name "build.gradle*" -exec sed -i 's/flutter.compileSdkVersion/36/g' {} +
+      # 🛡️ सेफ फिक्स: केवल उन फाइलों को फिक्स करो जो एरर दे रही हैं, पूरी ऐप को नहीं छेड़ना
+      - name: Patch Namespace and API levels
+        run: |
+          find /home/runner/.pub-cache/hosted/pub.dev/ -type f -name "build.gradle*" -exec sed -i 's/compileSdkVersion 33/compileSdkVersion 34/g' {} +
+          find /home/runner/.pub-cache/hosted/pub.dev/ -type f -name "build.gradle*" -exec sed -i 's/compileSdk 33/compileSdk 34/g' {} +
       
       - run: flutter pub get
       
-      # 🥷 सॉलिड ब्रह्मास्त्र: ProGuard एरर का पक्का इलाज
+      # 🥷 ProGuard फिक्स
       - name: Fix Proguard Error
         run: find /home/runner/.pub-cache/hosted/pub.dev/ -type f -name "build.gradle*" -path "*/flutter_inappwebview*/android/build.gradle*" -exec sed -i 's/proguard-android.txt/proguard-android-optimize.txt/g' {} +
       
