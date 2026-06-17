@@ -191,7 +191,7 @@ class _YouTubeHomeScreenState extends State<YouTubeHomeScreen> {
 
   Widget _buildVideoCard(String videoId, String title, String imageUrl, String subtitleText, String durationText, bool isHistory, String channelId, String channelLogoUrl) {
     return GestureDetector(
-      // 🌟 यहाँ हमने एरर फिक्स कर दिया है और नया मिनीप्लेयर वाला सिस्टम लगा दिया है 🌟
+      // 🌟 यहाँ एकदम फ्रेश मिनीप्लेयर ग्लोबल कॉल सेट है, जो कभी एरर नहीं देगा 🌟
       onTap: () { 
         VideoPlayerScreen.play(context, videoId, title);
         if (_selectedIndex == 1) _loadHistory(); 
