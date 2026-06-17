@@ -13,12 +13,15 @@ jobs:
       
       # 🌐 निंजा तकनीक 1: इंटरनेट परमिशन
       - run: sed -i 's/<application/<uses-permission android:name="android.permission.INTERNET"\/>\n    <application/g' android/app/src/main/AndroidManifest.xml
+
+      # 🚀 अल्टीमेट निंजा तकनीक: API 34 फिक्स (चाहे फाइल .gradle हो या .kts, यह दोनों को फिक्स करेगा)
+      - run: find android/app -type f -name "build.gradle*" -exec sed -i 's/flutter.compileSdkVersion/34/g' {} +
       
       - run: flutter pub get
       
-      # 🥷 सॉलिड ब्रह्मास्त्र: ProGuard एरर का पक्का इलाज (यह कभी फेल नहीं होगा)
+      # 🥷 सॉलिड ब्रह्मास्त्र: ProGuard एरर का पक्का इलाज
       - name: Fix Proguard Error
-        run: find /home/runner/.pub-cache/hosted/pub.dev/ -type f -name "build.gradle" -path "*/flutter_inappwebview*/android/build.gradle" -exec sed -i 's/proguard-android.txt/proguard-android-optimize.txt/g' {} +
+        run: find /home/runner/.pub-cache/hosted/pub.dev/ -type f -name "build.gradle*" -path "*/flutter_inappwebview*/android/build.gradle*" -exec sed -i 's/proguard-android.txt/proguard-android-optimize.txt/g' {} +
       
       - run: flutter build apk --release
       
