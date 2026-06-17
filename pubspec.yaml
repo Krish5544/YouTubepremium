@@ -1,0 +1,17 @@
+name: protube_app
+description: A new Flutter project.
+publish_to: 'none'
+version: 1.0.0+1
+
+environment:
+  sdk: '>=3.0.0 <4.0.0'
+
+dependencies:
+  flutter:
+    sdk: flutter
+  youtube_player_flutter: ^9.0.0
+  youtube_explode_dart: ^2.0.0
+
+dev_dependencies:
+  flutter_test:
+    sdk: flutter
