@@ -24,7 +24,9 @@ jobs:
       - name: Get Dependencies
         run: flutter pub get
 
-      # 🌟 यहाँ से हमने वो पुरानी एरर वाली sed कमांड हमेशा के लिए हटा दी है 🌟
+      # 🌟 यह रहा वो एकदम सही जादुई जुगाड़ जो इस एरर को उड़ा देगा 🌟
+      - name: Fix InAppWebView Proguard Error
+        run: sed -i "s/proguard-android.txt/proguard-android-optimize.txt/g" /home/runner/.pub-cache/hosted/pub.dev/flutter_inappwebview-*/android/build.gradle
 
       - name: Build APK
         run: flutter build apk --release
