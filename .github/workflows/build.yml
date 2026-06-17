@@ -1,27 +1,36 @@
 name: Build Android APK
-on: [push, workflow_dispatch]
+
+on:
+  push:
+    branches:
+      - main
+  workflow_dispatch:
+
 jobs:
   build:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
-      - uses: subosito/flutter-action@v2
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Flutter
+        uses: subosito/flutter-action@v2
         with:
           channel: 'stable'
-          
-      - run: flutter create --project-name protube_app . 
-      
-      # 🌐 निंजा तकनीक 1: ऐप में इंटरनेट की परमिशन की मोहर लगाना
-      - run: sed -i 's/<application/<uses-permission android:name="android.permission.INTERNET"\/>\n    <application/g' android/app/src/main/AndroidManifest.xml
-      
-      - run: flutter pub get
-      
-      # 🥷 निंजा तकनीक 2: पुरानी सेटिंग को फिक्स करना (जो हमने पहले किया था)
-      - run: sed -i "s/proguard-android.txt/proguard-android-optimize.txt/g" /home/runner/.pub-cache/hosted/pub.dev/flutter_inappwebview_android-*/android/build.gradle
-      
-      - run: flutter build apk --release
-      
-      - uses: actions/upload-artifact@v4
+
+      - name: Create Flutter Project
+        run: flutter create --project-name protube_app .
+
+      - name: Get Dependencies
+        run: flutter pub get
+
+      # 🌟 यहाँ से हमने वो पुरानी एरर वाली sed कमांड हमेशा के लिए हटा दी है 🌟
+
+      - name: Build APK
+        run: flutter build apk --release
+
+      - name: Upload APK
+        uses: actions/upload-artifact@v4
         with:
           name: release-apk
           path: build/app/outputs/flutter-apk/app-release.apk
