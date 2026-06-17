@@ -11,10 +11,11 @@ environment:
 dependencies:
   flutter:
     sdk: flutter
-  http: any
-  shared_preferences: any
-  youtube_player_flutter: any
-  # 🌟 ये रहे हमारे नए बैकग्राउंड म्यूजिक वाले पैकेजेस 🌟
+  http: ^1.1.0
+  shared_preferences: ^2.2.1
+  
+  # 🌟 यहाँ हमने वर्जन फिक्स कर दिए हैं ताकि कोई एरर न आए 🌟
+  youtube_player_flutter: ^8.1.2
   youtube_explode_dart: ^2.5.3
   just_audio: ^0.9.36
   audio_session: ^0.1.16
