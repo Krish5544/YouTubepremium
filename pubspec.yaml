@@ -1,6 +1,8 @@
 name: protube_app
 description: A new Flutter project.
+
 publish_to: 'none'
+
 version: 1.0.0+1
 
 environment:
@@ -9,11 +11,18 @@ environment:
 dependencies:
   flutter:
     sdk: flutter
-  youtube_player_flutter: ^9.0.0
-  youtube_explode_dart: ^2.0.0
-  shared_preferences: ^2.2.3 
-  http: ^1.2.0
+  http: any
+  shared_preferences: any
+  youtube_player_flutter: any
+  # 🌟 ये रहे हमारे नए बैकग्राउंड म्यूजिक वाले पैकेजेस 🌟
+  youtube_explode_dart: ^2.5.3
+  just_audio: ^0.9.36
+  audio_session: ^0.1.16
 
 dev_dependencies:
   flutter_test:
     sdk: flutter
+  flutter_lints: ^3.0.0
+
+flutter:
+  uses-material-design: true
