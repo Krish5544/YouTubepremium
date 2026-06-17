@@ -13,8 +13,12 @@ jobs:
       
       - run: flutter pub get
       
-      # 🌟 सिर्फ एक जरूरी परमिशन के लिए कमांड
+      # 🌐 निंजा तकनीक 1: इंटरनेट परमिशन
       - run: sed -i 's/<application/<uses-permission android:name="android.permission.INTERNET"\/>\n    <application/g' android/app/src/main/AndroidManifest.xml
+      
+      # 🥷 सॉलिड ब्रह्मास्त्र: ProGuard एरर का पक्का इलाज (यह कभी फेल नहीं होगा)
+      - name: Fix Proguard Error
+        run: find /home/runner/.pub-cache/hosted/pub.dev/ -type f -name "build.gradle" -path "*/flutter_inappwebview*/android/build.gradle" -exec sed -i 's/proguard-android.txt/proguard-android-optimize.txt/g' {} +
       
       # 🏗️ बिल्ड कमांड
       - run: flutter build apk --release
