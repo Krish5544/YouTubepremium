@@ -276,7 +276,7 @@ class _ChannelScreenState extends State<ChannelScreen> {
           }
           final video = vids[index];
           return InkWell(
-            onTap: () => Navigator.push(context, MaterialPageRoute(builder: (context) => VideoPlayerScreen(videoId: video['id'], title: video['title']))),
+            onTap: () => VideoPlayerScreen.play(context, videoId, title);,
             child: Padding(
               padding: const EdgeInsets.only(bottom: 15.0),
               child: Column(
