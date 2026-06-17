@@ -16,20 +16,14 @@ jobs:
       - name: Setup Flutter
         uses: subosito/flutter-action@v2
         with:
-          channel: 'stable'
+          # 🌟 यह है ब्रह्मास्त्र! हम गिटहब को एकदम स्टेबल वर्जन इस्तेमाल करने को कह रहे हैं 🌟
+          flutter-version: '3.16.9'
 
       - name: Create Flutter Project
         run: flutter create --project-name protube_app .
 
       - name: Get Dependencies
         run: flutter pub get
-
-      # 🌟 THE SOLID CURE: यह कोड एंड्रॉइड की सारी सख्तियों को बायपास कर देगा 🌟
-      - name: The Solid Cure (Fix Old Package Errors)
-        run: |
-          GRADLE_FILE=$(ls /home/runner/.pub-cache/hosted/pub.dev/flutter_inappwebview-*/android/build.gradle | head -n 1)
-          sed -i 's/proguard-android.txt/proguard-android-optimize.txt/g' $GRADLE_FILE
-          sed -i 's/android {/android {\n    namespace "com.pichillilorenzo.flutter_inappwebview"/g' $GRADLE_FILE
 
       - name: Build APK
         run: flutter build apk --release
