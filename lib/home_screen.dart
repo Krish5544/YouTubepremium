@@ -134,7 +134,7 @@ class _YouTubeHomeScreenState extends State<YouTubeHomeScreen> {
         backgroundColor: const Color(0xFF0F0F0F),
         elevation: 0,
         leadingWidth: 120,
-        leading: Padding(padding: const EdgeInsets.only(left: 12.0), child: Image.network('https://upload.wikimedia.org/wikipedia/commons/thumb/b/b8/YouTube_Logo_2017.svg/512px-YouTube_Logo_2017.svg.png', fit: BoxFit.contain)),
+        leading: Padding(padding: const EdgeInsets.only(left: 12.0), child: Image.network('https://upload.wikimedia.org/wikipedia/commons/thumb/b/b8/YouTube_Logo_2017.svg/512px-YouTube_Logo_2017.svg.png', fit: BoxFit.contain, errorBuilder: (c, e, s) => const Center(child: Text("ProTube", style: TextStyle(fontWeight: FontWeight.bold, color: Colors.white))))),
         actions: [
           Container(margin: const EdgeInsets.symmetric(horizontal: 8, vertical: 8), decoration: BoxDecoration(color: Colors.grey[800], shape: BoxShape.circle), child: IconButton(icon: const Icon(Icons.search, color: Colors.white, size: 22), onPressed: () => showSearch(context: context, delegate: VideoSearchDelegate((q) => _loadResults(q, isRefresh: true))))),
           const Padding(padding: EdgeInsets.only(right: 12.0, left: 4.0), child: CircleAvatar(radius: 14, backgroundColor: Colors.deepPurple, child: Text("K", style: TextStyle(fontSize: 14, color: Colors.white))))
@@ -152,24 +152,87 @@ class _YouTubeHomeScreenState extends State<YouTubeHomeScreen> {
   Widget _buildBody() {
     if (_selectedIndex == 0) {
       if (isLoading) return const Center(child: CircularProgressIndicator(color: Colors.red));
-      return ListView.builder(
-        itemCount: searchResults.length + (nextPageToken != null ? 1 : 0),
+      if (searchResults.isEmpty) return const Center(child: Text("कोई रिजल्ट नहीं मिला।", style: TextStyle(color: Colors.white)));
+      
+      return NotificationListener<ScrollNotification>(
+        onNotification: (ScrollNotification scrollInfo) {
+          if (!isLoadingMore && scrollInfo.metrics.pixels >= scrollInfo.metrics.maxScrollExtent - 200) _loadResults(currentQuery); 
+          return false;
+        },
+        child: ListView.builder(
+          itemCount: searchResults.length + (nextPageToken != null ? 1 : 0),
+          itemBuilder: (context, index) {
+            if (index == searchResults.length) return const Padding(padding: EdgeInsets.all(20.0), child: Center(child: CircularProgressIndicator(color: Colors.red)));
+            final item = searchResults[index];
+            
+            if (item['type'] == 'channel') {
+              return ListTile(contentPadding: const EdgeInsets.all(16), leading: CircleAvatar(radius: 30, backgroundImage: NetworkImage(item['thumbnail'])), title: Text(item['title'], style: const TextStyle(color: Colors.white, fontSize: 18, fontWeight: FontWeight.bold)), subtitle: const Text("SUBSCRIBE", style: TextStyle(color: Colors.red, fontWeight: FontWeight.bold)), onTap: () => Navigator.push(context, MaterialPageRoute(builder: (c) => ChannelScreen(channelId: item['id']))));
+            } else if (item['type'] == 'playlist') {
+              return ListTile(contentPadding: const EdgeInsets.all(8), leading: Stack(alignment: Alignment.centerRight, children: [Image.network(item['thumbnail'], width: 120, height: 80, fit: BoxFit.cover), Container(width: 40, height: 80, color: Colors.black.withOpacity(0.7), child: const Center(child: Icon(Icons.playlist_play, color: Colors.white)))]), title: Text(item['title'], style: const TextStyle(color: Colors.white, fontSize: 16)), subtitle: Text("Playlist • ${item['channel']}", style: const TextStyle(color: Colors.grey)), onTap: () => Navigator.push(context, MaterialPageRoute(builder: (c) => PlaylistScreen(playlistId: item['id'], playlistTitle: item['title']))));
+            } else {
+              return _buildVideoCard(item['id'], item['title'], item['thumbnail'], "${item['author']} • ${_formatViews(item['views'])} views • ${_formatExactDate(item['date'])}", item['durationStr'], false, item['channelId'], item['channelLogo']);
+            }
+          },
+        ),
+      );
+    } else if (_selectedIndex == 1) {
+       if (_historyData.isEmpty) return const Center(child: Text("आपने अभी तक कोई वीडियो नहीं देखी है।", style: TextStyle(color: Colors.grey, fontSize: 16)));
+       return ListView.builder(
+        itemCount: _historyData.length,
         itemBuilder: (context, index) {
-          if (index == searchResults.length) return const Padding(padding: EdgeInsets.all(20.0), child: Center(child: CircularProgressIndicator(color: Colors.red)));
-          final item = searchResults[index];
-          if (item['type'] == 'channel') return ListTile(contentPadding: const EdgeInsets.all(16), leading: CircleAvatar(radius: 30, backgroundImage: NetworkImage(item['thumbnail'])), title: Text(item['title'], style: const TextStyle(color: Colors.white, fontSize: 18, fontWeight: FontWeight.bold)), subtitle: const Text("SUBSCRIBE", style: TextStyle(color: Colors.red)), onTap: () => Navigator.push(context, MaterialPageRoute(builder: (c) => ChannelScreen(channelId: item['id']))));
-          if (item['type'] == 'playlist') return ListTile(contentPadding: const EdgeInsets.all(8), leading: Stack(alignment: Alignment.centerRight, children: [Image.network(item['thumbnail'], width: 120, height: 80, fit: BoxFit.cover), Container(width: 40, height: 80, color: Colors.black.withOpacity(0.7), child: const Center(child: Icon(Icons.playlist_play, color: Colors.white)))]), title: Text(item['title'], style: const TextStyle(color: Colors.white, fontSize: 16)), subtitle: Text("Playlist • ${item['channel']}", style: const TextStyle(color: Colors.grey)), onTap: () => Navigator.push(context, MaterialPageRoute(builder: (c) => PlaylistScreen(playlistId: item['id'], playlistTitle: item['title']))));
-          return _buildVideoCard(item['id'], item['title'], item['thumbnail'], "${item['author']} • ${_formatViews(item['views'])} views • ${_formatExactDate(item['date'])}", item['durationStr'], false, item['channelId'], item['channelLogo']);
+          final data = _historyData[index];
+          return _buildVideoCard(data['id'], data['title'], 'https://img.youtube.com/vi/${data['id']}/hqdefault.jpg', "History", _formatDuration(data['position'] ?? 0), true, data['channelId'] ?? '', data['channelLogo'] ?? '');
         },
       );
+    } else {
+      return const Center(child: Text("जल्द आ रहा है!", style: TextStyle(color: Colors.grey)));
     }
-    return ListView.builder(itemCount: _historyData.length, itemBuilder: (context, index) { final data = _historyData[index]; return _buildVideoCard(data['id'], data['title'], 'https://img.youtube.com/vi/${data['id']}/hqdefault.jpg', "History", _formatDuration(data['position'] ?? 0), true, data['channelId'] ?? '', data['channelLogo'] ?? ''); });
   }
 
   Widget _buildVideoCard(String videoId, String title, String imageUrl, String subtitleText, String durationText, bool isHistory, String channelId, String channelLogoUrl) {
     return GestureDetector(
-      onTap: () => VideoPlayerScreen.play(context, videoId, title);.then((_) { if (_selectedIndex == 1) _loadHistory(); }),
-      child: Padding(padding: const EdgeInsets.only(bottom: 15.0), child: Column(children: [Stack(alignment: Alignment.bottomRight, children: [Image.network(imageUrl, height: 220, width: double.infinity, fit: BoxFit.cover), Container(margin: const EdgeInsets.all(8), padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 2), color: Colors.black.withOpacity(0.8), child: Text(durationText, style: const TextStyle(color: Colors.white, fontSize: 12)))]), Padding(padding: const EdgeInsets.fromLTRB(12, 12, 12, 0), child: Row(children: [GestureDetector(onTap: () => Navigator.push(context, MaterialPageRoute(builder: (c) => ChannelScreen(channelId: channelId))), child: CircleAvatar(backgroundColor: Colors.grey[800], backgroundImage: channelLogoUrl.isNotEmpty ? NetworkImage(channelLogoUrl) : null, child: channelLogoUrl.isEmpty ? const Icon(Icons.person, color: Colors.white) : null)), const SizedBox(width: 12), Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [Text(title, style: const TextStyle(color: Colors.white, fontSize: 15), maxLines: 2, overflow: TextOverflow.ellipsis), const SizedBox(height: 4), Text(isHistory ? "आपने $durationText तक देखा" : subtitleText, style: const TextStyle(color: Colors.grey, fontSize: 12))]))]))])),
+      // 🌟 यहाँ हमने एरर फिक्स कर दिया है और नया मिनीप्लेयर वाला सिस्टम लगा दिया है 🌟
+      onTap: () { 
+        VideoPlayerScreen.play(context, videoId, title);
+        if (_selectedIndex == 1) _loadHistory(); 
+      },
+      child: Padding(
+        padding: const EdgeInsets.only(bottom: 15.0),
+        child: Column(
+          children: [
+            Stack(
+              alignment: Alignment.bottomRight,
+              children: [
+                Image.network(imageUrl, height: 220, width: double.infinity, fit: BoxFit.cover, errorBuilder: (c,e,s) => Container(height: 220, color: Colors.grey[900])),
+                Container(margin: const EdgeInsets.all(8), padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 2), color: Colors.black.withOpacity(0.8), child: Text(durationText, style: const TextStyle(color: Colors.white, fontSize: 12)))
+              ],
+            ),
+            Padding(
+              padding: const EdgeInsets.fromLTRB(12, 12, 12, 0),
+              child: Row(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  GestureDetector(
+                    onTap: () { if (channelId.isNotEmpty) Navigator.push(context, MaterialPageRoute(builder: (context) => ChannelScreen(channelId: channelId))); },
+                    child: CircleAvatar(backgroundColor: Colors.grey[800], backgroundImage: channelLogoUrl.isNotEmpty ? NetworkImage(channelLogoUrl) : null, child: channelLogoUrl.isEmpty ? const Icon(Icons.person, color: Colors.white) : null),
+                  ),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(title, style: const TextStyle(color: Colors.white, fontSize: 15, fontWeight: FontWeight.w500), maxLines: 2, overflow: TextOverflow.ellipsis),
+                        const SizedBox(height: 4),
+                        Text(isHistory ? "आपने $durationText तक देखा" : subtitleText, style: const TextStyle(color: Colors.grey, fontSize: 12)),
+                      ],
+                    ),
+                  ),
+                ],
+              ),
+            )
+          ],
+        ),
+      ),
     );
   }
 }
