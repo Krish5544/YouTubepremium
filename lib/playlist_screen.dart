@@ -66,7 +66,8 @@ class _PlaylistScreenState extends State<PlaylistScreen> {
                   leading: Image.network(video['thumbnail'], width: 100, fit: BoxFit.cover, errorBuilder: (c,e,s) => Container(width: 100, color: Colors.grey[900])),
                   title: Text(video['title'], style: const TextStyle(color: Colors.white, fontSize: 14), maxLines: 2, overflow: TextOverflow.ellipsis),
                   subtitle: Text(video['author'], style: const TextStyle(color: Colors.grey, fontSize: 12)),
-                  onTap: () => VideoPlayerScreen.play(context, videoId, title);,
+                  // 🌟 यहीं पर एरर था जिसे एकदम सही कर दिया गया है 🌟
+                  onTap: () => VideoPlayerScreen.play(context, video['id'], video['title']),
                 );
               },
             ),
