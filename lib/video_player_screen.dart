@@ -2,6 +2,7 @@ import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:youtube_player_flutter/youtube_player_flutter.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import 'package:share_plus/share_plus.dart'; // 🌟 शेयर पैकेज इम्पोर्ट किया
 
 class VideoPlayerScreen extends StatefulWidget {
   final String videoId;
@@ -22,7 +23,6 @@ class _VideoPlayerScreenState extends State<VideoPlayerScreen> {
     _initPlayer();
   }
 
-  // यह फंक्शन पुरानी सेव की हुई टाइमिंग ढूँढेगा
   Future<void> _initPlayer() async {
     final prefs = await SharedPreferences.getInstance();
     int startPosition = 0;
@@ -56,7 +56,6 @@ class _VideoPlayerScreenState extends State<VideoPlayerScreen> {
     }
   }
 
-  // यह फंक्शन वीडियो चलते हुए उसकी टाइमिंग सेव करेगा
   void _savePosition() async {
     if (_controller.value.isReady) {
       final prefs = await SharedPreferences.getInstance();
@@ -90,6 +89,12 @@ class _VideoPlayerScreenState extends State<VideoPlayerScreen> {
     super.dispose();
   }
 
+  // 🌟 यह है शेयर करने वाला जादुई फंक्शन 🌟
+  void _shareVideo() {
+    final String youtubeLink = 'https://youtu.be/${widget.videoId}';
+    Share.share('इस शानदार वीडियो को ProTube पर देखें: ${widget.title}\n$youtubeLink');
+  }
+
   @override
   Widget build(BuildContext context) {
     if (!_isPlayerReady) {
@@ -100,15 +105,14 @@ class _VideoPlayerScreenState extends State<VideoPlayerScreen> {
       );
     }
 
-    // 🌟 WillPopScope: वीडियो प्लेयर स्क्रीन का बैक बटन फिक्स 🌟
+    // हमारा पुराना बैक-बटन गार्ड
     return WillPopScope(
       onWillPop: () async {
-        // अगर वीडियो फुल स्क्रीन मोड में चल रही है, तो बैक दबाने पर पहले नॉर्मल मोड में आएगी
         if (_controller.value.isFullScreen) {
           _controller.toggleFullScreenMode();
-          return false; // ऐप या स्क्रीन को बंद मत होने दो
+          return false; 
         }
-        return true; // नॉर्मल मोड में पिछले पेज पर जाने दो
+        return true; 
       },
       child: YoutubePlayerBuilder(
         player: YoutubePlayer(
@@ -129,8 +133,15 @@ class _VideoPlayerScreenState extends State<VideoPlayerScreen> {
           return Scaffold(
             backgroundColor: Colors.black,
             appBar: AppBar(
-              title: Text(widget.title),
+              title: Text(widget.title, style: const TextStyle(fontSize: 16)),
               backgroundColor: Colors.black,
+              actions: [
+                // 🌟 यह रहा तुम्हारा शेयर (Share) बटन 🌟
+                IconButton(
+                  icon: const Icon(Icons.share, color: Colors.white),
+                  onPressed: _shareVideo,
+                ),
+              ],
             ),
             body: Center(child: player),
           );
