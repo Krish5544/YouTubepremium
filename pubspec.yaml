@@ -11,6 +11,8 @@ dependencies:
     sdk: flutter
   youtube_player_flutter: ^9.0.0
   youtube_explode_dart: ^2.0.0
+  shared_preferences: ^2.2.3 
+  http: ^1.2.0
 
 dev_dependencies:
   flutter_test:
