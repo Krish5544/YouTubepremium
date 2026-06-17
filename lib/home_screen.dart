@@ -128,23 +128,42 @@ class _YouTubeHomeScreenState extends State<YouTubeHomeScreen> {
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      backgroundColor: const Color(0xFF0F0F0F),
-      appBar: AppBar(
+    // 🌟 WillPopScope: यह पूरी ऐप का ग्लोबल गार्ड है जो बैक बटन दबाने पर स्टेप-बाय-स्टेप पीछे लाएगा 🌟
+    return WillPopScope(
+      onWillPop: () async {
+        // 1. अगर यूज़र History या Subscriptions टैब पर है, तो पहले Home टैब (0) पर वापस लाओ
+        if (_selectedIndex != 0) {
+          setState(() {
+            _selectedIndex = 0;
+          });
+          return false; // ऐप बंद मत करो
+        }
+        // 2. अगर यूज़र ने कुछ सर्च किया हुआ है और वह होम स्क्रीन पर है, तो डिफ़ॉल्ट मुख्य फ़ीड पर वापस लाओ
+        if (currentQuery != "UPSSSC Lower PCS classes") {
+          _loadResults("UPSSSC Lower PCS classes", isRefresh: true);
+          return false; // ऐप बंद मत करो
+        }
+        // 3. अगर सब कुछ पहले से ही डिफ़ॉल्ट है, तब ऐप बंद होने दो
+        return true;
+      },
+      child: Scaffold(
         backgroundColor: const Color(0xFF0F0F0F),
-        elevation: 0,
-        leadingWidth: 120,
-        leading: Padding(padding: const EdgeInsets.only(left: 12.0), child: Image.network('https://upload.wikimedia.org/wikipedia/commons/thumb/b/b8/YouTube_Logo_2017.svg/512px-YouTube_Logo_2017.svg.png', fit: BoxFit.contain)),
-        actions: [
-          Container(margin: const EdgeInsets.symmetric(horizontal: 8, vertical: 8), decoration: BoxDecoration(color: Colors.grey[800], shape: BoxShape.circle), child: IconButton(icon: const Icon(Icons.search, color: Colors.white, size: 22), onPressed: () => showSearch(context: context, delegate: VideoSearchDelegate((q) => _loadResults(q, isRefresh: true))))),
-          const Padding(padding: EdgeInsets.only(right: 12.0, left: 4.0), child: CircleAvatar(radius: 14, backgroundColor: Colors.deepPurple, child: Text("K", style: TextStyle(fontSize: 14, color: Colors.white))))
-        ],
-      ),
-      body: _buildBody(),
-      bottomNavigationBar: BottomNavigationBar(
-        backgroundColor: const Color(0xFF0F0F0F), selectedItemColor: Colors.white, unselectedItemColor: Colors.grey, currentIndex: _selectedIndex,
-        onTap: (i) { setState(() => _selectedIndex = i); if (i == 1) _loadHistory(); },
-        items: const [BottomNavigationBarItem(icon: Icon(Icons.home_filled), label: "Home"), BottomNavigationBarItem(icon: Icon(Icons.history), label: "History"), BottomNavigationBarItem(icon: Icon(Icons.subscriptions_outlined), label: "Subscriptions")],
+        appBar: AppBar(
+          backgroundColor: const Color(0xFF0F0F0F),
+          elevation: 0,
+          leadingWidth: 120,
+          leading: Padding(padding: const EdgeInsets.only(left: 12.0), child: Image.network('https://upload.wikimedia.org/wikipedia/commons/thumb/b/b8/YouTube_Logo_2017.svg/512px-YouTube_Logo_2017.svg.png', fit: BoxFit.contain)),
+          actions: [
+            Container(margin: const EdgeInsets.symmetric(horizontal: 8, vertical: 8), decoration: BoxDecoration(color: Colors.grey[800], shape: BoxShape.circle), child: IconButton(icon: const Icon(Icons.search, color: Colors.white, size: 22), onPressed: () => showSearch(context: context, delegate: VideoSearchDelegate((q) => _loadResults(q, isRefresh: true))))),
+            const Padding(padding: EdgeInsets.only(right: 12.0, left: 4.0), child: CircleAvatar(radius: 14, backgroundColor: Colors.deepPurple, child: Text("K", style: TextStyle(fontSize: 14, color: Colors.white))))
+          ],
+        ),
+        body: _buildBody(),
+        bottomNavigationBar: BottomNavigationBar(
+          backgroundColor: const Color(0xFF0F0F0F), selectedItemColor: Colors.white, unselectedItemColor: Colors.grey, currentIndex: _selectedIndex,
+          onTap: (i) { setState(() => _selectedIndex = i); if (i == 1) _loadHistory(); },
+          items: const [BottomNavigationBarItem(icon: Icon(Icons.home_filled), label: "Home"), BottomNavigationBarItem(icon: Icon(Icons.history), label: "History"), BottomNavigationBarItem(icon: Icon(Icons.subscriptions_outlined), label: "Subscriptions")],
+        ),
       ),
     );
   }
