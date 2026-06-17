@@ -14,8 +14,8 @@ jobs:
       # 🌐 निंजा तकनीक 1: इंटरनेट परमिशन
       - run: sed -i 's/<application/<uses-permission android:name="android.permission.INTERNET"\/>\n    <application/g' android/app/src/main/AndroidManifest.xml
 
-      # 🚀 अल्टीमेट निंजा तकनीक: API 34 फिक्स (चाहे फाइल .gradle हो या .kts, यह दोनों को फिक्स करेगा)
-      - run: find android/app -type f -name "build.gradle*" -exec sed -i 's/flutter.compileSdkVersion/34/g' {} +
+      # 🚀 अल्टीमेट निंजा तकनीक 2.0: API 36 फिक्स (लेटेस्ट पैकेजेस के लिए)
+      - run: find android/app -type f -name "build.gradle*" -exec sed -i 's/flutter.compileSdkVersion/36/g' {} +
       
       - run: flutter pub get
       
