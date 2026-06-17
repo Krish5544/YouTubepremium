@@ -1,5 +1,5 @@
 import 'package:flutter/material.dart';
-import 'home_screen.dart'; 
+import 'home_screen.dart';
 
 void main() {
   runApp(const MyApp());
@@ -11,18 +11,19 @@ class MyApp extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return MaterialApp(
+      title: 'ProTube',
       debugShowCheckedModeBanner: false,
-      title: 'Pro Tube',
-      theme: ThemeData.dark().copyWith(
+      theme: ThemeData(
+        brightness: Brightness.dark,
+        primaryColor: Colors.red,
         scaffoldBackgroundColor: const Color(0xFF0F0F0F),
-        bottomNavigationBarTheme: const BottomNavigationBarThemeData(
-          backgroundColor: Color(0xFF0F0F0F),
-          selectedItemColor: Colors.white,
-          unselectedItemColor: Colors.grey,
-          type: BottomNavigationBarType.fixed,
-        ),
       ),
-      home: const YouTubeHomeScreen(),
+      // 🌟 यहाँ ध्यान दो भाई! 🌟
+      // हमने MaterialApp के अंदर सीधे home_screen को कॉल करने के बजाय
+      // एक Builder विजेट लगाया है ताकि हमारे मिनीप्लेयर Overlay को ऐप का सही Context मिल सके।
+      home: Builder(
+        builder: (context) => const YouTubeHomeScreen(),
+      ),
     );
   }
 }
