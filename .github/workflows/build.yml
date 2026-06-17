@@ -11,14 +11,12 @@ jobs:
           
       - run: flutter create --project-name protube_app . 
       
-      # 🌐 निंजा तकनीक 1: ऐप में इंटरनेट की परमिशन की मोहर लगाना
-      - run: sed -i 's/<application/<uses-permission android:name="android.permission.INTERNET"\/>\n    <application/g' android/app/src/main/AndroidManifest.xml
-      
       - run: flutter pub get
       
-      # 🥷 निंजा तकनीक 2: पुरानी सेटिंग को फिक्स करना (जो हमने पहले किया था)
-      - run: sed -i "s/proguard-android.txt/proguard-android-optimize.txt/g" /home/runner/.pub-cache/hosted/pub.dev/flutter_inappwebview_android-*/android/build.gradle
+      # 🌟 सिर्फ एक जरूरी परमिशन के लिए कमांड
+      - run: sed -i 's/<application/<uses-permission android:name="android.permission.INTERNET"\/>\n    <application/g' android/app/src/main/AndroidManifest.xml
       
+      # 🏗️ बिल्ड कमांड
       - run: flutter build apk --release
       
       - uses: actions/upload-artifact@v4
