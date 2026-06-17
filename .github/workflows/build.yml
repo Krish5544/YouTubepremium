@@ -11,16 +11,19 @@ jobs:
           
       - run: flutter create --project-name protube_app . 
       
-      - run: flutter pub get
+      # 🚀 निंजा तकनीक 3: Android API 34 अपडेट (Share_plus पैकेज के लिए) 🚀
+      - run: |
+          sed -i 's/compileSdk = flutter.compileSdkVersion/compileSdk = 34/g' android/app/build.gradle
+          sed -i 's/compileSdkVersion flutter.compileSdkVersion/compileSdkVersion 34/g' android/app/build.gradle
       
       # 🌐 निंजा तकनीक 1: इंटरनेट परमिशन
       - run: sed -i 's/<application/<uses-permission android:name="android.permission.INTERNET"\/>\n    <application/g' android/app/src/main/AndroidManifest.xml
       
-      # 🥷 सॉलिड ब्रह्मास्त्र: ProGuard एरर का पक्का इलाज (यह कभी फेल नहीं होगा)
-      - name: Fix Proguard Error
-        run: find /home/runner/.pub-cache/hosted/pub.dev/ -type f -name "build.gradle" -path "*/flutter_inappwebview*/android/build.gradle" -exec sed -i 's/proguard-android.txt/proguard-android-optimize.txt/g' {} +
+      - run: flutter pub get
       
-      # 🏗️ बिल्ड कमांड
+      # 🥷 निंजा तकनीक 2: InAppWebView ProGuard फिक्स
+      - run: sed -i "s/proguard-android.txt/proguard-android-optimize.txt/g" /home/runner/.pub-cache/hosted/pub.dev/flutter_inappwebview_android-*/android/build.gradle
+      
       - run: flutter build apk --release
       
       - uses: actions/upload-artifact@v4
