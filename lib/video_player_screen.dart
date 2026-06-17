@@ -45,7 +45,7 @@ class _VideoPlayerScreenState extends State<VideoPlayerScreen> {
       flags: YoutubePlayerFlags(
         autoPlay: true,
         mute: false,
-        startAt: startPosition, // यहीं से वीडियो वापस शुरू होगी!
+        startAt: startPosition, 
       ),
     )..addListener(_savePosition);
 
@@ -100,31 +100,42 @@ class _VideoPlayerScreenState extends State<VideoPlayerScreen> {
       );
     }
 
-    return YoutubePlayerBuilder(
-      player: YoutubePlayer(
-        controller: _controller,
-        showVideoProgressIndicator: true,
-        progressColors: const ProgressBarColors(
-          playedColor: Colors.red,
-          handleColor: Colors.redAccent,
-        ),
-        bottomActions: [
-          const CurrentPosition(),
-          const ProgressBar(isExpanded: true),
-          const RemainingDuration(),
-          const FullScreenButton(), // यह है तुम्हारा वीडियो बड़ा/छोटा करने वाला बटन!
-        ],
-      ),
-      builder: (context, player) {
-        return Scaffold(
-          backgroundColor: Colors.black,
-          appBar: AppBar(
-            title: Text(widget.title),
-            backgroundColor: Colors.black,
-          ),
-          body: Center(child: player),
-        );
+    // 🌟 WillPopScope: वीडियो प्लेयर स्क्रीन का बैक बटन फिक्स 🌟
+    return WillPopScope(
+      onWillPop: () async {
+        // अगर वीडियो फुल स्क्रीन मोड में चल रही है, तो बैक दबाने पर पहले नॉर्मल मोड में आएगी
+        if (_controller.value.isFullScreen) {
+          _controller.toggleFullScreenMode();
+          return false; // ऐप या स्क्रीन को बंद मत होने दो
+        }
+        return true; // नॉर्मल मोड में पिछले पेज पर जाने दो
       },
+      child: YoutubePlayerBuilder(
+        player: YoutubePlayer(
+          controller: _controller,
+          showVideoProgressIndicator: true,
+          progressColors: const ProgressBarColors(
+            playedColor: Colors.red,
+            handleColor: Colors.redAccent,
+          ),
+          bottomActions: [
+            const CurrentPosition(),
+            const ProgressBar(isExpanded: true),
+            const RemainingDuration(),
+            const FullScreenButton(), 
+          ],
+        ),
+        builder: (context, player) {
+          return Scaffold(
+            backgroundColor: Colors.black,
+            appBar: AppBar(
+              title: Text(widget.title),
+              backgroundColor: Colors.black,
+            ),
+            body: Center(child: player),
+          );
+        },
+      ),
     );
   }
 }
