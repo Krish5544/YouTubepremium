@@ -66,7 +66,7 @@ class _PlaylistScreenState extends State<PlaylistScreen> {
                   leading: Image.network(video['thumbnail'], width: 100, fit: BoxFit.cover, errorBuilder: (c,e,s) => Container(width: 100, color: Colors.grey[900])),
                   title: Text(video['title'], style: const TextStyle(color: Colors.white, fontSize: 14), maxLines: 2, overflow: TextOverflow.ellipsis),
                   subtitle: Text(video['author'], style: const TextStyle(color: Colors.grey, fontSize: 12)),
-                  onTap: () => Navigator.push(context, MaterialPageRoute(builder: (c) => VideoPlayerScreen(videoId: video['id'], title: video['title']))),
+                  onTap: () => VideoPlayerScreen.play(context, videoId, title);,
                 );
               },
             ),
