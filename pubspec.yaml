@@ -14,9 +14,11 @@ dependencies:
   shared_preferences: ^2.2.3 
   http: ^1.2.0
   share_plus: ^7.2.2
-  # 🌟 MX Player जेस्चर्स के लिए 2 नए जादुई पैकेजेस 🌟
+  
+  # 🌟 MX Player जेस्चर्स के लिए 2 जादुई पैकेजेस 🌟
   volume_controller: ^2.0.7
-  screen_brightness: ^3.0.0
+  # ⬇️ यहाँ गिटहब की माँग के अनुसार वर्ज़न 2.1.1 कर दिया गया है ⬇️
+  screen_brightness: ^2.1.1
 
 dev_dependencies:
   flutter_test:
