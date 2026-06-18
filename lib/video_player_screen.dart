@@ -1,8 +1,9 @@
 import 'dart:convert';
 import 'package:flutter/material.dart';
+import 'package:http/http.dart' as http; // 🌟 असली वीडियोज़ मंगाने के लिए
 import 'package:youtube_player_flutter/youtube_player_flutter.dart';
 import 'package:shared_preferences/shared_preferences.dart';
-import 'package:share_plus/share_plus.dart'; 
+import 'package:share_plus/share_plus.dart';
 
 class VideoPlayerScreen extends StatefulWidget {
   final String videoId;
@@ -16,13 +17,54 @@ class VideoPlayerScreen extends StatefulWidget {
 class _VideoPlayerScreenState extends State<VideoPlayerScreen> {
   late YoutubePlayerController _controller;
   bool _isPlayerReady = false;
-  
   bool _isDescriptionExpanded = false;
+  
+  // 🌟 असली वीडियोज़ के लिए वेरिएबल्स
+  List<Map<String, dynamic>> _relatedVideos = [];
+  bool _isLoadingRelated = true;
+  final String apiKey = 'AIzaSyBpPAohs_WhlCTiozmCVMEzrGsRE86LgpU';
 
   @override
   void initState() {
     super.initState();
     _initPlayer();
+    _fetchRelatedVideos(); // वीडियोज़ मंगाने का फंक्शन कॉल
+  }
+
+  // 🌟 YouTube API से असली 'Up Next' वीडियोज़ मंगाना
+  Future<void> _fetchRelatedVideos() async {
+    try {
+      // वीडियो के टाइटल से मिलते-जुलते कीवर्ड्स निकालना
+      String query = Uri.encodeComponent(widget.title.split(' ').take(3).join(' '));
+      String url = 'https://www.googleapis.com/youtube/v3/search?part=snippet&maxResults=15&q=$query&type=video&key=$apiKey';
+
+      var res = await http.get(Uri.parse(url));
+      var data = jsonDecode(res.body);
+      List items = data['items'] ?? [];
+      
+      List<Map<String, dynamic>> newResults = [];
+      for (var item in items) {
+        // जो वीडियो चल रही है, उसे दोबारा लिस्ट में नहीं दिखाना
+        if (item['id']['videoId'] != widget.videoId) {
+          newResults.add({
+            'id': item['id']['videoId'],
+            'title': item['snippet']['title'],
+            'thumbnail': item['snippet']['thumbnails']['high']?['url'] ?? '',
+            'channel': item['snippet']['channelTitle'],
+            'date': item['snippet']['publishedAt'],
+          });
+        }
+      }
+      
+      if (mounted) {
+        setState(() {
+          _relatedVideos = newResults;
+          _isLoadingRelated = false;
+        });
+      }
+    } catch (e) {
+      if (mounted) setState(() => _isLoadingRelated = false);
+    }
   }
 
   Future<void> _initPlayer() async {
@@ -96,6 +138,13 @@ class _VideoPlayerScreenState extends State<VideoPlayerScreen> {
     Share.share('इस शानदार वीडियो को ProTube पर देखें:\n${widget.title}\n\nलिंक: $youtubeLink');
   }
 
+  String _formatDate(String dateStr) {
+    try {
+      DateTime date = DateTime.parse(dateStr);
+      return "${date.day}/${date.month}/${date.year}";
+    } catch(e) { return ""; }
+  }
+
   @override
   Widget build(BuildContext context) {
     if (!_isPlayerReady) {
@@ -134,7 +183,10 @@ class _VideoPlayerScreenState extends State<VideoPlayerScreen> {
             body: SafeArea(
               child: Column(
                 children: [
+                  // 1. वीडियो प्लेयर (सबसे ऊपर फिक्स)
                   player,
+                  
+                  // 2. नीचे की स्क्रॉल लिस्ट
                   Expanded(
                     child: ListView(
                       padding: const EdgeInsets.symmetric(horizontal: 12.0, vertical: 14.0),
@@ -144,11 +196,6 @@ class _VideoPlayerScreenState extends State<VideoPlayerScreen> {
                           style: const TextStyle(color: Colors.white, fontSize: 17, fontWeight: FontWeight.bold, height: 1.3),
                           maxLines: 2,
                           overflow: TextOverflow.ellipsis,
-                        ),
-                        const SizedBox(height: 6),
-                        const Text(
-                          "120K views • 2 days ago",
-                          style: TextStyle(color: Colors.grey, fontSize: 12),
                         ),
                         const SizedBox(height: 12),
                         
@@ -160,12 +207,12 @@ class _VideoPlayerScreenState extends State<VideoPlayerScreen> {
                               child: Icon(Icons.play_arrow, color: Colors.white, size: 16),
                             ),
                             const SizedBox(width: 10),
-                            const Expanded(
+                            Expanded(
                               child: Column(
                                 crossAxisAlignment: CrossAxisAlignment.start,
-                                children: [
-                                  Text("ProTube Online Classes", style: TextStyle(color: Colors.white, fontSize: 14, fontWeight: FontWeight.bold)),
-                                  Text("2.5M subscribers", style: TextStyle(color: Colors.grey, fontSize: 11)),
+                                children: const [
+                                  Text("ProTube Channel", style: TextStyle(color: Colors.white, fontSize: 14, fontWeight: FontWeight.bold)),
+                                  Text("Subscribe & Learn", style: TextStyle(color: Colors.grey, fontSize: 11)),
                                 ],
                               ),
                             ),
@@ -185,24 +232,11 @@ class _VideoPlayerScreenState extends State<VideoPlayerScreen> {
                           scrollDirection: Axis.horizontal,
                           child: Row(
                             children: [
-                              // 🌟 यहाँ पर स्पेलिंग फिक्स कर दी गई है 🌟
-                              _buildPillButton(
-                                icon: Icons.thumb_up_outlined, 
-                                label: "15K",
-                                onTap: () {},
-                              ),
+                              _buildPillButton(icon: Icons.thumb_up_outlined, label: "Like", onTap: () {}),
                               const SizedBox(width: 8),
-                              _buildPillButton(
-                                icon: Icons.share_outlined,
-                                label: "Share",
-                                onTap: _shareVideo, 
-                              ),
+                              _buildPillButton(icon: Icons.share_outlined, label: "Share", onTap: _shareVideo),
                               const SizedBox(width: 8),
-                              _buildPillButton(
-                                icon: Icons.download_outlined, 
-                                label: "Download",
-                                onTap: () {},
-                              ),
+                              _buildPillButton(icon: Icons.download_outlined, label: "Download", onTap: () {}),
                             ],
                           ),
                         ),
@@ -226,8 +260,8 @@ class _VideoPlayerScreenState extends State<VideoPlayerScreen> {
                               children: [
                                 Text(
                                   _isDescriptionExpanded 
-                                      ? "नमस्कार साथियों! ProTube ऐप में आपका स्वागत है। इस वीडियो में हमने आगामी प्रतियोगी परीक्षाओं (जैसे UPSSSC Lower PCS, RO/ARO) के लिए बेहद महत्वपूर्ण विषयों को कवर किया है। अपनी तैयारी को मजबूत करने के लिए क्लास को अंत तक जरूर देखें।\n\n🔹 परीक्षा उपयोगी महत्वपूर्ण नोट्स\n🔹 पिछले वर्षों के प्रश्नों का विश्लेषण\n\nवीडियो को लाइक करें और अपने दोस्तों के साथ SHARE करना न भूलें! धन्यवाद।"
-                                      : "नमस्कार साथियों! ProTube ऐप में आपका स्वागत है। इस वीडियो में हमने आगामी प्रतियोगी परीक्षाओं के लिए...",
+                                      ? "ProTube ऐप में आपका स्वागत है। इस वीडियो में हमने आगामी परीक्षाओं के लिए महत्वपूर्ण विषयों को कवर किया है।\n\nअपनी तैयारी को मजबूत करने के लिए पूरी वीडियो देखें और हमारे चैनल को सपोर्ट करें।"
+                                      : "ProTube ऐप में आपका स्वागत है। इस वीडियो में...",
                                   style: const TextStyle(color: Colors.white, fontSize: 13, height: 1.4),
                                   maxLines: _isDescriptionExpanded ? 100 : 2,
                                   overflow: TextOverflow.ellipsis,
@@ -248,7 +282,14 @@ class _VideoPlayerScreenState extends State<VideoPlayerScreen> {
                         
                         const Text("Up next", style: TextStyle(color: Colors.white, fontSize: 15, fontWeight: FontWeight.bold)),
                         const SizedBox(height: 14),
-                        ...List.generate(6, (index) => _buildDummyRelatedVideo()),
+                        
+                        // 🌟 असली वीडियोज़ का डिज़ाइन 🌟
+                        if (_isLoadingRelated)
+                          const Center(child: Padding(padding: EdgeInsets.all(20.0), child: CircularProgressIndicator(color: Colors.red)))
+                        else if (_relatedVideos.isEmpty)
+                          const Center(child: Text("No related videos found", style: TextStyle(color: Colors.grey)))
+                        else
+                          ..._relatedVideos.map((video) => _buildRealRelatedVideo(video)).toList(),
                       ],
                     ),
                   ),
@@ -282,35 +323,59 @@ class _VideoPlayerScreenState extends State<VideoPlayerScreen> {
     );
   }
 
-  Widget _buildDummyRelatedVideo() {
-    return Padding(
-      padding: const EdgeInsets.only(bottom: 16.0),
-      child: Row(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Container(
-            width: 140,
-            height: 80,
-            decoration: BoxDecoration(
-              color: Colors.white10,
-              borderRadius: BorderRadius.circular(8),
+  // 🌟 असली 'Up next' वीडियोज़ का कार्ड
+  Widget _buildRealRelatedVideo(Map<String, dynamic> video) {
+    return GestureDetector(
+      onTap: () {
+        // वीडियो पर क्लिक करते ही नया प्लेयर खुल जाएगा
+        Navigator.pushReplacement(
+          context,
+          MaterialPageRoute(
+            builder: (context) => VideoPlayerScreen(
+              videoId: video['id'],
+              title: video['title'],
             ),
-            child: const Icon(Icons.play_circle_outline, color: Colors.white30, size: 30),
           ),
-          const SizedBox(width: 12),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Container(height: 12, width: double.infinity, decoration: BoxDecoration(color: Colors.white10, borderRadius: BorderRadius.circular(4))),
-                const SizedBox(height: 8),
-                Container(height: 12, width: 120, decoration: BoxDecoration(color: Colors.white10, borderRadius: BorderRadius.circular(4))),
-                const SizedBox(height: 8),
-                Container(height: 10, width: 70, decoration: BoxDecoration(color: Colors.white10, borderRadius: BorderRadius.circular(4))),
-              ],
+        );
+      },
+      child: Padding(
+        padding: const EdgeInsets.only(bottom: 16.0),
+        child: Row(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            ClipRRect(
+              borderRadius: BorderRadius.circular(8),
+              child: Image.network(
+                video['thumbnail'],
+                width: 140,
+                height: 80,
+                fit: BoxFit.cover,
+                errorBuilder: (c, e, s) => Container(width: 140, height: 80, color: Colors.grey[800]),
+              ),
             ),
-          )
-        ],
+            const SizedBox(width: 12),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    video['title'],
+                    style: const TextStyle(color: Colors.white, fontSize: 14, fontWeight: FontWeight.bold),
+                    maxLines: 2,
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                  const SizedBox(height: 4),
+                  Text(
+                    "${video['channel']} • ${_formatDate(video['date'])}",
+                    style: const TextStyle(color: Colors.grey, fontSize: 11),
+                    maxLines: 2,
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                ],
+              ),
+            )
+          ],
+        ),
       ),
     );
   }
