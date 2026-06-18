@@ -30,8 +30,13 @@ class _VideoPlayerScreenState extends State<VideoPlayerScreen> {
   bool _isNavigatingToNext = false; 
   bool _isFullScreenState = false;
 
-  // 🌟 Watch Later का वेरिएबल (बिना किसी लोडिंग के) 🌟
+  // Watch Later का वेरिएबल
   bool _isInWatchLater = false;
+
+  // 🌟 Subscribe फीचर के वेरिएबल्स 🌟
+  bool _isSubscribed = false;
+  String _channelId = "";
+  String _channelTitle = "ProTube Channel";
 
   // MX Player जेस्चर के वेरिएबल्स
   double _volume = 0.5;
@@ -45,7 +50,7 @@ class _VideoPlayerScreenState extends State<VideoPlayerScreen> {
   void initState() {
     super.initState();
     _initPlayer();
-    _fetchRelatedVideos();
+    _fetchVideoDetailsAndRelated(); // 🌟 यहाँ से चैनल ID भी मिलेगी
     _initGestures();
     _checkIfWatchLater(); 
   }
@@ -62,46 +67,48 @@ class _VideoPlayerScreenState extends State<VideoPlayerScreen> {
     if (mounted) setState(() => _isInWatchLater = exists);
   }
 
-  // 🌟 एकदम इंस्टेंट 1 मिलीसेकंड वाला फंक्शन 🌟
-  Future<void> _toggleWatchLater() async {
+  // 🌟 चेक करने का फंक्शन कि चैनल पहले से सब्सक्राइब है या नहीं 🌟
+  Future<void> _checkSubscription() async {
+    if (_channelId.isEmpty) return;
     final prefs = await SharedPreferences.getInstance();
-    List<String> savedList = prefs.getStringList('watch_later') ?? [];
-    
-    Map<String, dynamic> videoData = {
-      'id': widget.videoId,
-      'title': widget.title,
-    };
-    String videoJson = jsonEncode(videoData);
+    List<String> subList = prefs.getStringList('subscribed_channels') ?? [];
+    bool exists = subList.contains(_channelId);
+    if (mounted) setState(() => _isSubscribed = exists);
+  }
 
-    if (_isInWatchLater) {
-      savedList.removeWhere((item) {
-        try { return jsonDecode(item)['id'] == widget.videoId; } catch(e) { return false; }
-      });
-      if (mounted) setState(() => _isInWatchLater = false);
-      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text("Watch Later से हटा दिया गया", style: TextStyle(color: Colors.white)), backgroundColor: Colors.red));
+  // 🌟 चैनल को सब्सक्राइब/अनसब्सक्राइब करने का जादुई फंक्शन 🌟
+  Future<void> _toggleSubscription() async {
+    if (_channelId.isEmpty) return;
+    final prefs = await SharedPreferences.getInstance();
+    List<String> subList = prefs.getStringList('subscribed_channels') ?? [];
+
+    if (_isSubscribed) {
+      subList.remove(_channelId);
+      if (mounted) setState(() => _isSubscribed = false);
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text("$_channelTitle को अनसब्सक्राइब कर दिया"), backgroundColor: Colors.red));
     } else {
-      savedList.removeWhere((item) {
-        try { return jsonDecode(item)['id'] == widget.videoId; } catch(e) { return false; }
-      });
-      savedList.insert(0, videoJson);
-      if (mounted) setState(() => _isInWatchLater = true);
-      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text("Watch Later में जोड़ दिया गया", style: TextStyle(color: Colors.white)), backgroundColor: Colors.green));
+      subList.add(_channelId);
+      if (mounted) setState(() => _isSubscribed = true);
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text("$_channelTitle सब्सक्राइब हो गया!"), backgroundColor: Colors.green));
     }
-    prefs.setStringList('watch_later', savedList);
+    prefs.setStringList('subscribed_channels', subList);
   }
 
-  Future<void> _initGestures() async {
+  // 🌟 वीडियो की पूरी जानकारी और चैनल ID निकालने का फंक्शन 🌟
+  Future<void> _fetchVideoDetailsAndRelated() async {
     try {
-      await FlutterVolumeController.updateShowSystemUI(false);
-      double? initVol = await FlutterVolumeController.getVolume();
-      if (initVol != null && mounted) setState(() => _volume = initVol);
-      double initBright = await ScreenBrightness().current;
-      if (mounted) setState(() => _brightness = initBright);
-    } catch (e) { }
-  }
+      // पहले वीडियो की डिटेल्स निकालकर उसकी ChannelId लेंगे
+      String detailsUrl = 'https://www.googleapis.com/youtube/v3/videos?part=snippet&id=${widget.videoId}&key=$apiKey';
+      var detailsRes = await http.get(Uri.parse(detailsUrl));
+      var detailsData = jsonDecode(detailsRes.body);
+      if (detailsData['items'] != null && detailsData['items'].isNotEmpty) {
+        var snippet = detailsData['items'][0]['snippet'];
+        _channelId = snippet['channelId'] ?? "";
+        _channelTitle = snippet['channelTitle'] ?? "ProTube Channel";
+        _checkSubscription(); // चैनल ID मिलते ही सब्सक्राइब स्टेटस चेक करो
+      }
 
-  Future<void> _fetchRelatedVideos() async {
-    try {
+      // अब रिलेटेड वीडियोज़ लोड करेंगे
       String query = Uri.encodeComponent(widget.title.split(' ').take(3).join(' '));
       String url = 'https://www.googleapis.com/youtube/v3/search?part=snippet&maxResults=15&q=$query&type=video&key=$apiKey';
       var res = await http.get(Uri.parse(url));
@@ -122,6 +129,34 @@ class _VideoPlayerScreenState extends State<VideoPlayerScreen> {
     } catch (e) {
       if (mounted) setState(() => _isLoadingRelated = false);
     }
+  }
+
+  Future<void> _toggleWatchLater() async {
+    final prefs = await SharedPreferences.getInstance();
+    List<String> savedList = prefs.getStringList('watch_later') ?? [];
+    Map<String, dynamic> videoData = {'id': widget.videoId, 'title': widget.title};
+    String videoJson = jsonEncode(videoData);
+
+    if (_isInWatchLater) {
+      savedList.removeWhere((item) => jsonDecode(item)['id'] == widget.videoId);
+      if (mounted) setState(() => _isInWatchLater = false);
+      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text("Watch Later से हटा दिया गया"), backgroundColor: Colors.red));
+    } else {
+      savedList.insert(0, videoJson);
+      if (mounted) setState(() => _isInWatchLater = true);
+      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text("Watch Later में जोड़ दिया गया"), backgroundColor: Colors.green));
+    }
+    prefs.setStringList('watch_later', savedList);
+  }
+
+  Future<void> _initGestures() async {
+    try {
+      await FlutterVolumeController.updateShowSystemUI(false);
+      double? initVol = await FlutterVolumeController.getVolume();
+      if (initVol != null && mounted) setState(() => _volume = initVol);
+      double initBright = await ScreenBrightness().current;
+      if (mounted) setState(() => _brightness = initBright);
+    } catch (e) { }
   }
 
   Future<void> _initPlayer() async {
@@ -159,9 +194,7 @@ class _VideoPlayerScreenState extends State<VideoPlayerScreen> {
     if (_controller.value.isReady && !_isNavigatingToNext) {
       final prefs = await SharedPreferences.getInstance();
       List<String> historyList = prefs.getStringList('video_history') ?? [];
-      historyList.removeWhere((item) {
-        try { return jsonDecode(item)['id'] == widget.videoId; } catch (e) { return false; }
-      });
+      historyList.removeWhere((item) => jsonDecode(item)['id'] == widget.videoId);
       Map<String, dynamic> newData = {
         'id': widget.videoId, 'title': widget.title,
         'position': _controller.value.position.inSeconds, 'timestamp': DateTime.now().millisecondsSinceEpoch,
@@ -195,13 +228,10 @@ class _VideoPlayerScreenState extends State<VideoPlayerScreen> {
 
   void _changeVolume(double delta) {
     setState(() {
-      _volume += delta;
-      if (_volume > 1.0) _volume = 1.0;
-      if (_volume < 0.0) _volume = 0.0;
+      _volume += delta; if (_volume > 1.0) _volume = 1.0; if (_volume < 0.0) _volume = 0.0;
       FlutterVolumeController.setVolume(_volume);
       _indicatorIcon = _volume > 0 ? Icons.volume_up : Icons.volume_off;
-      _indicatorText = "${(_volume * 100).toInt()}%";
-      _showIndicator = true;
+      _indicatorText = "${(_volume * 100).toInt()}%"; _showIndicator = true;
     });
     _indicatorTimer?.cancel();
     _indicatorTimer = Timer(const Duration(seconds: 2), () { if (mounted) setState(() => _showIndicator = false); });
@@ -209,13 +239,9 @@ class _VideoPlayerScreenState extends State<VideoPlayerScreen> {
 
   void _changeBrightness(double delta) {
     setState(() {
-      _brightness += delta;
-      if (_brightness > 1.0) _brightness = 1.0;
-      if (_brightness < 0.0) _brightness = 0.0;
+      _brightness += delta; if (_brightness > 1.0) _brightness = 1.0; if (_brightness < 0.0) _brightness = 0.0;
       ScreenBrightness().setScreenBrightness(_brightness);
-      _indicatorIcon = Icons.brightness_6;
-      _indicatorText = "${(_brightness * 100).toInt()}%";
-      _showIndicator = true;
+      _indicatorIcon = Icons.brightness_6; _indicatorText = "${(_brightness * 100).toInt()}%"; _showIndicator = true;
     });
     _indicatorTimer?.cancel();
     _indicatorTimer = Timer(const Duration(seconds: 2), () { if (mounted) setState(() => _showIndicator = false); });
@@ -227,16 +253,12 @@ class _VideoPlayerScreenState extends State<VideoPlayerScreen> {
   }
 
   String _formatDate(String dateStr) {
-    try {
-      DateTime date = DateTime.parse(dateStr);
-      return "${date.day}/${date.month}/${date.year}";
-    } catch(e) { return ""; }
+    try { DateTime date = DateTime.parse(dateStr); return "${date.day}/${date.month}/${date.year}"; } catch(e) { return ""; }
   }
 
   Widget _buildGestureOverlay() {
     return Column(
       children: [
-        Navigator.canPop(context) ? const SizedBox() : const SizedBox(),
         Expanded(
           flex: 8,
           child: Row(
@@ -249,8 +271,7 @@ class _VideoPlayerScreenState extends State<VideoPlayerScreen> {
                   onDoubleTap: () {
                     _controller.seekTo(_controller.value.position - const Duration(seconds: 10));
                     setState(() { _indicatorIcon = Icons.fast_rewind; _indicatorText = "-10s"; _showIndicator = true; });
-                    _indicatorTimer?.cancel();
-                    _indicatorTimer = Timer(const Duration(seconds: 1), () { if (mounted) setState(() => _showIndicator = false); });
+                    _indicatorTimer?.cancel(); _indicatorTimer = Timer(const Duration(seconds: 1), () { if (mounted) setState(() => _showIndicator = false); });
                   },
                   child: Container(),
                 ),
@@ -264,8 +285,7 @@ class _VideoPlayerScreenState extends State<VideoPlayerScreen> {
                   onDoubleTap: () {
                     _controller.seekTo(_controller.value.position + const Duration(seconds: 10));
                     setState(() { _indicatorIcon = Icons.fast_forward; _indicatorText = "+10s"; _showIndicator = true; });
-                    _indicatorTimer?.cancel();
-                    _indicatorTimer = Timer(const Duration(seconds: 1), () { if (mounted) setState(() => _showIndicator = false); });
+                    _indicatorTimer?.cancel(); _indicatorTimer = Timer(const Duration(seconds: 1), () { if (mounted) setState(() => _showIndicator = false); });
                   },
                   child: Container(),
                 ),
@@ -283,10 +303,7 @@ class _VideoPlayerScreenState extends State<VideoPlayerScreen> {
     if (!_isPlayerReady) return const Scaffold(backgroundColor: Color(0xFF0F0F0F), body: Center(child: CircularProgressIndicator(color: Colors.red)));
 
     return WillPopScope(
-      onWillPop: () async {
-        if (_isFullScreenState) { _controller.toggleFullScreenMode(); return false; }
-        return true; 
-      },
+      onWillPop: () async { if (_isFullScreenState) { _controller.toggleFullScreenMode(); return false; } return true; },
       child: OrientationBuilder(
         builder: (context, orientation) {
           bool isLandscape = orientation == Orientation.landscape;
@@ -307,11 +324,7 @@ class _VideoPlayerScreenState extends State<VideoPlayerScreen> {
                   decoration: BoxDecoration(color: Colors.black.withOpacity(0.8), borderRadius: BorderRadius.circular(16)),
                   child: Column(
                     mainAxisSize: MainAxisSize.min,
-                    children: [
-                      Icon(_indicatorIcon, color: Colors.white, size: 40),
-                      const SizedBox(height: 8),
-                      Text(_indicatorText, style: const TextStyle(color: Colors.white, fontSize: 18, fontWeight: FontWeight.bold)),
-                    ],
+                    children: [Icon(_indicatorIcon, color: Colors.white, size: 40), const SizedBox(height: 8), Text(_indicatorText, style: const TextStyle(color: Colors.white, fontSize: 18, fontWeight: FontWeight.bold))],
                   ),
                 ),
             ],
@@ -335,8 +348,23 @@ class _VideoPlayerScreenState extends State<VideoPlayerScreen> {
                               children: [
                                 const CircleAvatar(radius: 16, backgroundColor: Colors.red, child: Icon(Icons.play_arrow, color: Colors.white, size: 16)),
                                 const SizedBox(width: 10),
-                                Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: const [Text("ProTube Channel", style: TextStyle(color: Colors.white, fontSize: 14, fontWeight: FontWeight.bold)), Text("Subscribe & Learn", style: TextStyle(color: Colors.grey, fontSize: 11))])),
-                                Container(padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8), decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(20)), child: const Text("Subscribe", style: TextStyle(color: Colors.black, fontSize: 12, fontWeight: FontWeight.bold))),
+                                Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [Text(_channelTitle, style: const TextStyle(color: Colors.white, fontSize: 14, fontWeight: FontWeight.bold)), const Text("ProTube Channel", style: TextStyle(color: Colors.grey, fontSize: 11))])),
+                                
+                                // 🌟 यह रहा हमारा एकदम असली, एक्टिव 'Subscribe' बटन 🌟
+                                GestureDetector(
+                                  onTap: _toggleSubscription,
+                                  child: Container(
+                                    padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                                    decoration: BoxDecoration(
+                                      color: _isSubscribed ? Colors.white12 : Colors.white,
+                                      borderRadius: BorderRadius.circular(20),
+                                    ),
+                                    child: Text(
+                                      _isSubscribed ? "Subscribed" : "Subscribe", 
+                                      style: TextStyle(color: _isSubscribed ? Colors.grey : Colors.black, fontSize: 12, fontWeight: FontWeight.bold)
+                                    ),
+                                  ),
+                                ),
                               ],
                             ),
                             const SizedBox(height: 14),
@@ -346,8 +374,6 @@ class _VideoPlayerScreenState extends State<VideoPlayerScreen> {
                                 children: [
                                   _buildPillButton(icon: Icons.thumb_up_outlined, label: "Like", onTap: () {}), const SizedBox(width: 8),
                                   _buildPillButton(icon: Icons.share_outlined, label: "Share", onTap: _shareVideo), const SizedBox(width: 8),
-                                  
-                                  // 🌟 यहाँ हमने 'खाली' और 'भरे हुए' (सॉलिड) आइकन का लॉजिक लगाया है 🌟
                                   _buildPillButton(
                                     icon: _isInWatchLater ? Icons.watch_later : Icons.watch_later_outlined, 
                                     label: _isInWatchLater ? "Added" : "Watch Later", 
@@ -393,21 +419,7 @@ class _VideoPlayerScreenState extends State<VideoPlayerScreen> {
   }
 
   Widget _buildPillButton({required IconData icon, required String label, required VoidCallback onTap, Color iconColor = Colors.white}) {
-    return InkWell(
-      onTap: onTap, 
-      borderRadius: BorderRadius.circular(20), 
-      child: Container(
-        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 7), 
-        decoration: BoxDecoration(color: Colors.white10, borderRadius: BorderRadius.circular(20)), 
-        child: Row(
-          children: [
-            Icon(icon, color: iconColor, size: 18), 
-            const SizedBox(width: 6), 
-            Text(label, style: const TextStyle(color: Colors.white, fontSize: 12, fontWeight: FontWeight.bold))
-          ]
-        )
-      )
-    );
+    return InkWell(onTap: onTap, borderRadius: BorderRadius.circular(20), child: Container(padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 7), decoration: BoxDecoration(color: Colors.white10, borderRadius: BorderRadius.circular(20)), child: Row(children: [Icon(icon, color: iconColor, size: 18), const SizedBox(width: 6), Text(label, style: const TextStyle(color: Colors.white, fontSize: 12, fontWeight: FontWeight.bold))])));
   }
 
   Widget _buildRealRelatedVideo(Map<String, dynamic> video) {
