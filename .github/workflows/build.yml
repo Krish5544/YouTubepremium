@@ -11,16 +11,23 @@ jobs:
           
       - run: flutter create --project-name protube_app . 
       
-      # 🌐 निंजा तकनीक: इंटरनेट परमिशन
+      # 🌐 निंजा तकनीक 1: इंटरनेट परमिशन
       - run: sed -i 's/<application/<uses-permission android:name="android.permission.INTERNET"\/>\n    <application/g' android/app/src/main/AndroidManifest.xml
 
-      # 🛡️ सेफ फिक्स: केवल उन फाइलों को फिक्स करो जो एरर दे रही हैं, पूरी ऐप को नहीं छेड़ना
-      - name: Patch Namespace and API levels
+      # 📦 सबसे पहले पैकेजेस डाउनलोड करो ताकि कोई फाइल मिस न हो
+      - run: flutter pub get
+
+      # 🛡️ सेफ फिक्स 1: पुराने API 33 को 34 पर लाना
+      - name: Patch API levels
         run: |
           find /home/runner/.pub-cache/hosted/pub.dev/ -type f -name "build.gradle*" -exec sed -i 's/compileSdkVersion 33/compileSdkVersion 34/g' {} +
           find /home/runner/.pub-cache/hosted/pub.dev/ -type f -name "build.gradle*" -exec sed -i 's/compileSdk 33/compileSdk 34/g' {} +
       
-      - run: flutter pub get
+      # 🚀 नया ब्रह्मास्त्र: Java 1.8 और 11 के झगड़े का पक्का इलाज (Volume Controller फिक्स)
+      - name: Fix Kotlin JVM Target
+        run: |
+          find /home/runner/.pub-cache/hosted/pub.dev/ -type f -name "build.gradle*" -exec sed -i "s/jvmTarget = '1.8'/jvmTarget = '11'/g" {} +
+          find /home/runner/.pub-cache/hosted/pub.dev/ -type f -name "build.gradle*" -exec sed -i 's/jvmTarget = "1.8"/jvmTarget = "11"/g' {} +
       
       # 🥷 ProGuard फिक्स
       - name: Fix Proguard Error
