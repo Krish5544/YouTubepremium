@@ -16,13 +16,17 @@ jobs:
 
       - run: flutter pub get
 
-      # 🛡️ सेफ फिक्स 1: पुराने API 33 को 34 पर लाना
+      # 🛡️ सेफ फिक्स: API 31, 32, 33 सबको पकड़कर 34 पर सेट करो (Volume Controller Fix)
       - name: Patch API levels safely
         run: |
+          find /home/runner/.pub-cache/hosted/pub.dev/ -type f -name "build.gradle*" -exec sed -i 's/compileSdkVersion 31/compileSdkVersion 34/g' {} +
+          find /home/runner/.pub-cache/hosted/pub.dev/ -type f -name "build.gradle*" -exec sed -i 's/compileSdk 31/compileSdk 34/g' {} +
+          find /home/runner/.pub-cache/hosted/pub.dev/ -type f -name "build.gradle*" -exec sed -i 's/compileSdkVersion 32/compileSdkVersion 34/g' {} +
+          find /home/runner/.pub-cache/hosted/pub.dev/ -type f -name "build.gradle*" -exec sed -i 's/compileSdk 32/compileSdk 34/g' {} +
           find /home/runner/.pub-cache/hosted/pub.dev/ -type f -name "build.gradle*" -exec sed -i 's/compileSdkVersion 33/compileSdkVersion 34/g' {} +
           find /home/runner/.pub-cache/hosted/pub.dev/ -type f -name "build.gradle*" -exec sed -i 's/compileSdk 33/compileSdk 34/g' {} +
       
-      # 🚀 सबसे सुरक्षित फिक्स: बिना फाइलें छेड़े Gradle को Java 11 का रूल देना
+      # 🚀 सबसे सुरक्षित फिक्स: Java 11 का रूल 
       - name: Safe Gradle JVM Patch
         run: |
           cat <<EOF >> android/build.gradle
