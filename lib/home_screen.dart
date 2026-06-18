@@ -24,13 +24,15 @@ class _YouTubeHomeScreenState extends State<YouTubeHomeScreen> {
   String? nextPageToken;
   String currentQuery = "UPSSSC Lower PCS classes";
   
-  // हिस्ट्री, वाच लेटर और सब्सक्रिप्शन का डेटा
   List<Map<String, dynamic>> _historyData = [];
   List<Map<String, dynamic>> _watchLaterData = [];
   
-  // 🌟 Subscriptions के वेरिएबल्स 🌟
+  // 🌟 Subscriptions के एडवांस वेरिएबल्स 🌟
   List<Map<String, dynamic>> _subscriptionsData = [];
+  List<Map<String, dynamic>> _subscribedChannelsDetails = []; 
   bool _isLoadingSubscriptions = false;
+  bool _isLoadingMoreSubs = false;
+  int _currentSubChannelOffset = 0; 
 
   @override
   void initState() {
@@ -38,9 +40,10 @@ class _YouTubeHomeScreenState extends State<YouTubeHomeScreen> {
     _loadResults(currentQuery, isRefresh: true);
     _loadHistory(); 
     _loadWatchLater(); 
-    _loadSubscriptions(); // 🌟 ऐप खुलते ही सब्सक्रिप्शंस भी लोड होंगे
+    _loadSubscriptions(isRefresh: true); 
   }
 
+  // 🌟 फ्लोलेस (Pre-fetch) सर्च रिजल्ट लोडिंग 🌟
   Future<void> _loadResults(String query, {bool isRefresh = false}) async {
     if (isRefresh) {
       setState(() { isLoading = true; searchResults.clear(); nextPageToken = null; currentQuery = query; });
@@ -112,72 +115,88 @@ class _YouTubeHomeScreenState extends State<YouTubeHomeScreen> {
     setState(() => _watchLaterData = savedList.map((item) => jsonDecode(item) as Map<String, dynamic>).toList());
   }
 
-  // 🌟 सब्सक्राइब किए गए चैनल्स की वीडियोज़ लोड करने का मास्टर लॉजिक 🌟
-  Future<void> _loadSubscriptions() async {
-    if (!mounted) return;
-    setState(() { _isLoadingSubscriptions = true; _subscriptionsData.clear(); });
+  // 🌟 सब्सक्रिप्शन का अल्टीमेट इनफिनिट लोडर (बिना अटके) 🌟
+  Future<void> _loadSubscriptions({bool isRefresh = false}) async {
+    if (isRefresh) {
+      _currentSubChannelOffset = 0;
+      if (mounted) setState(() { _isLoadingSubscriptions = true; _subscriptionsData.clear(); _subscribedChannelsDetails.clear(); });
+    } else {
+      if (_isLoadingMoreSubs) return;
+      if (mounted) setState(() => _isLoadingMoreSubs = true);
+    }
     
     final prefs = await SharedPreferences.getInstance();
     List<String> subChannels = prefs.getStringList('subscribed_channels') ?? [];
 
     if (subChannels.isEmpty) {
-      if (mounted) setState(() => _isLoadingSubscriptions = false);
+      if (mounted) setState(() { _isLoadingSubscriptions = false; _isLoadingMoreSubs = false; });
       return;
     }
 
     try {
-      List<Map<String, dynamic>> allVideos = [];
-      
-      // टॉप 10 चैनल्स की 5-5 लेटेस्ट वीडियोज़ निकालेंगे (ताकि ऐप हैंग न हो)
-      for (String cId in subChannels.take(10)) {
-        String url = 'https://www.googleapis.com/youtube/v3/search?part=snippet&channelId=$cId&maxResults=5&order=date&type=video&key=$apiKey';
-        var res = await http.get(Uri.parse(url));
-        if (res.statusCode == 200) {
-          var data = jsonDecode(res.body);
-          List items = data['items'] ?? [];
-          for (var item in items) {
-            allVideos.add({
-              'type': 'video',
-              'id': item['id']['videoId'],
-              'title': item['snippet']['title'],
-              'thumbnail': item['snippet']['thumbnails']['high']?['url'] ?? '',
-              'author': item['snippet']['channelTitle'],
-              'channelId': item['snippet']['channelId'],
-              'date': item['snippet']['publishedAt'],
-              'durationStr': '',
-              'views': '0',
+      if (isRefresh) {
+        var top50Channels = subChannels.take(50).toList(); 
+        var channelRes = await http.get(Uri.parse('https://www.googleapis.com/youtube/v3/channels?part=snippet&id=${top50Channels.join(',')}&key=$apiKey'));
+        if (channelRes.statusCode == 200) {
+          var chData = jsonDecode(channelRes.body)['items'] ?? [];
+          for (var ch in chData) {
+            _subscribedChannelsDetails.add({
+              'id': ch['id'], 'title': ch['snippet']['title'], 'thumbnail': ch['snippet']['thumbnails']['default']?['url'] ?? ''
             });
           }
         }
       }
 
-      // 🌟 सारी वीडियोज़ को 'ताज़ा डेट और टाइम' के हिसाब से सॉर्ट (क्रमबद्ध) करेंगे 🌟
-      allVideos.sort((a, b) {
-        DateTime dateA = DateTime.parse(a['date']);
-        DateTime dateB = DateTime.parse(b['date']);
-        return dateB.compareTo(dateA); // सबसे नई वीडियो सबसे ऊपर
-      });
+      int limit = 5;
+      var batchChannels = subChannels.skip(_currentSubChannelOffset).take(limit).toList();
 
-      // अब इन वीडियोज़ के व्यूज़ और ड्यूरेशन निकालेंगे
-      if (allVideos.isNotEmpty) {
-        List<String> videoIds = allVideos.map((v) => v['id'].toString()).take(50).toList();
-        var detailsRes = await http.get(Uri.parse('https://www.googleapis.com/youtube/v3/videos?part=contentDetails,statistics&id=${videoIds.join(',')}&key=$apiKey'));
-        if (detailsRes.statusCode == 200) {
-           var vDetails = jsonDecode(detailsRes.body)['items'] ?? [];
-           Map<String, dynamic> detailMap = { for (var v in vDetails) v['id']: v };
-           for(var v in allVideos) {
-              var d = detailMap[v['id']];
-              if (d != null) {
-                 v['durationStr'] = _formatDuration(_parseDuration(d['contentDetails']['duration']));
-                 v['views'] = d['statistics']['viewCount'] ?? '0';
-              }
-           }
+      if (batchChannels.isNotEmpty) {
+        List<Map<String, dynamic>> newVideos = [];
+        
+        for (String cId in batchChannels) {
+          String url = 'https://www.googleapis.com/youtube/v3/search?part=snippet&channelId=$cId&maxResults=10&order=date&type=video&key=$apiKey';
+          var res = await http.get(Uri.parse(url));
+          if (res.statusCode == 200) {
+            var data = jsonDecode(res.body);
+            List items = data['items'] ?? [];
+            for (var item in items) {
+              newVideos.add({
+                'type': 'video', 'id': item['id']['videoId'], 'title': item['snippet']['title'],
+                'thumbnail': item['snippet']['thumbnails']['high']?['url'] ?? '', 'author': item['snippet']['channelTitle'],
+                'channelId': item['snippet']['channelId'], 'date': item['snippet']['publishedAt'],
+                'durationStr': '', 'views': '0', 'channelLogo': ''
+              });
+            }
+          }
         }
+
+        if (newVideos.isNotEmpty) {
+          List<String> videoIds = newVideos.map((v) => v['id'].toString()).toList();
+          for (int i = 0; i < videoIds.length; i += 50) {
+            var chunk = videoIds.skip(i).take(50).toList();
+            var detailsRes = await http.get(Uri.parse('https://www.googleapis.com/youtube/v3/videos?part=contentDetails,statistics&id=${chunk.join(',')}&key=$apiKey'));
+            if (detailsRes.statusCode == 200) {
+               var vDetails = jsonDecode(detailsRes.body)['items'] ?? [];
+               Map<String, dynamic> detailMap = { for (var v in vDetails) v['id']: v };
+               for(var v in newVideos) {
+                  var d = detailMap[v['id']];
+                  if (d != null) {
+                     v['durationStr'] = _formatDuration(_parseDuration(d['contentDetails']['duration']));
+                     v['views'] = d['statistics']['viewCount'] ?? '0';
+                  }
+               }
+            }
+          }
+        }
+
+        _subscriptionsData.addAll(newVideos);
+        _subscriptionsData.sort((a, b) => DateTime.parse(b['date']).compareTo(DateTime.parse(a['date'])));
+        _currentSubChannelOffset += limit;
       }
 
-      if (mounted) setState(() { _subscriptionsData = allVideos; _isLoadingSubscriptions = false; });
+      if (mounted) setState(() { _isLoadingSubscriptions = false; _isLoadingMoreSubs = false; });
     } catch (e) {
-      if (mounted) setState(() => _isLoadingSubscriptions = false);
+      if (mounted) setState(() { _isLoadingSubscriptions = false; _isLoadingMoreSubs = false; });
     }
   }
 
@@ -214,22 +233,14 @@ class _YouTubeHomeScreenState extends State<YouTubeHomeScreen> {
   Widget build(BuildContext context) {
     return WillPopScope(
       onWillPop: () async {
-        if (_selectedIndex != 0) {
-          setState(() { _selectedIndex = 0; });
-          return false; 
-        }
-        if (currentQuery != "UPSSSC Lower PCS classes") {
-          _loadResults("UPSSSC Lower PCS classes", isRefresh: true);
-          return false; 
-        }
+        if (_selectedIndex != 0) { setState(() { _selectedIndex = 0; }); return false; }
+        if (currentQuery != "UPSSSC Lower PCS classes") { _loadResults("UPSSSC Lower PCS classes", isRefresh: true); return false; }
         return true;
       },
       child: Scaffold(
         backgroundColor: const Color(0xFF0F0F0F),
         appBar: AppBar(
-          backgroundColor: const Color(0xFF0F0F0F),
-          elevation: 0,
-          leadingWidth: 120,
+          backgroundColor: const Color(0xFF0F0F0F), elevation: 0, leadingWidth: 120,
           leading: Padding(padding: const EdgeInsets.only(left: 12.0), child: Image.network('https://upload.wikimedia.org/wikipedia/commons/thumb/b/b8/YouTube_Logo_2017.svg/512px-YouTube_Logo_2017.svg.png', fit: BoxFit.contain)),
           actions: [
             Container(margin: const EdgeInsets.symmetric(horizontal: 8, vertical: 8), decoration: BoxDecoration(color: Colors.grey[800], shape: BoxShape.circle), child: IconButton(icon: const Icon(Icons.search, color: Colors.white, size: 22), onPressed: () => showSearch(context: context, delegate: VideoSearchDelegate((q) => _loadResults(q, isRefresh: true))))),
@@ -238,15 +249,10 @@ class _YouTubeHomeScreenState extends State<YouTubeHomeScreen> {
         ),
         body: _buildBody(),
         bottomNavigationBar: BottomNavigationBar(
-          backgroundColor: const Color(0xFF0F0F0F), 
-          selectedItemColor: Colors.white, 
-          unselectedItemColor: Colors.grey, 
-          currentIndex: _selectedIndex,
-          type: BottomNavigationBarType.fixed, 
+          backgroundColor: const Color(0xFF0F0F0F), selectedItemColor: Colors.white, unselectedItemColor: Colors.grey, currentIndex: _selectedIndex, type: BottomNavigationBarType.fixed, 
           onTap: (i) { 
             setState(() => _selectedIndex = i); 
-            // 🌟 जब भी जो टैब दबेगा, उसका डेटा रिफ्रेश होगा 🌟
-            if (i == 1) _loadSubscriptions(); 
+            if (i == 1 && _subscriptionsData.isEmpty) _loadSubscriptions(isRefresh: true); 
             if (i == 2) _loadHistory(); 
             if (i == 3) _loadWatchLater(); 
           },
@@ -265,9 +271,11 @@ class _YouTubeHomeScreenState extends State<YouTubeHomeScreen> {
     // 🏠 टैब 0: Home Screen
     if (_selectedIndex == 0) {
       if (isLoading) return const Center(child: CircularProgressIndicator(color: Colors.red));
+      
       return NotificationListener<ScrollNotification>(
         onNotification: (ScrollNotification scrollInfo) {
-          if (!isLoadingMore && scrollInfo.metrics.pixels == scrollInfo.metrics.maxScrollExtent) {
+          // 🌟 800 पिक्सल वाली स्मार्ट प्री-लोडिंग (यहाँ से जादू शुरू) 🌟
+          if (!isLoadingMore && scrollInfo.metrics.pixels >= scrollInfo.metrics.maxScrollExtent - 800) {
             _loadResults(currentQuery); 
           }
           return true;
@@ -284,40 +292,74 @@ class _YouTubeHomeScreenState extends State<YouTubeHomeScreen> {
         ),
       );
     } 
-    // 📺 टैब 1: Subscriptions (🌟 एकदम नया फीचर 🌟)
+    
+    // 📺 टैब 1: Subscriptions
     else if (_selectedIndex == 1) {
       if (_isLoadingSubscriptions) return const Center(child: CircularProgressIndicator(color: Colors.red));
-      if (_subscriptionsData.isEmpty) return const Center(child: Column(mainAxisAlignment: MainAxisAlignment.center, children: [Icon(Icons.subscriptions_outlined, size: 60, color: Colors.grey), SizedBox(height: 10), Text("No subscriptions yet", style: TextStyle(color: Colors.grey, fontSize: 16))]));
+      if (_subscriptionsData.isEmpty && _subscribedChannelsDetails.isEmpty) return const Center(child: Column(mainAxisAlignment: MainAxisAlignment.center, children: [Icon(Icons.subscriptions_outlined, size: 60, color: Colors.grey), SizedBox(height: 10), Text("No subscriptions yet", style: TextStyle(color: Colors.grey, fontSize: 16))]));
       
-      return ListView.builder(
-        itemCount: _subscriptionsData.length, 
-        itemBuilder: (context, index) { 
-          final data = _subscriptionsData[index]; 
-          return _buildVideoCard(data['id'], data['title'], data['thumbnail'], "${data['author']} • ${_formatViews(data['views'])} views • ${_formatExactDate(data['date'])}", data['durationStr'], false, data['channelId'], ""); 
-        }
+      return Column(
+        children: [
+          // 🌟 ऊपर की गोल पट्टी (Horizontal Channel List) 🌟
+          if (_subscribedChannelsDetails.isNotEmpty)
+            Container(
+              height: 100, padding: const EdgeInsets.symmetric(vertical: 10),
+              decoration: const BoxDecoration(border: Border(bottom: BorderSide(color: Colors.white12, width: 1))),
+              child: ListView.builder(
+                scrollDirection: Axis.horizontal,
+                itemCount: _subscribedChannelsDetails.length,
+                itemBuilder: (context, index) {
+                  final ch = _subscribedChannelsDetails[index];
+                  return GestureDetector(
+                    onTap: () => Navigator.push(context, MaterialPageRoute(builder: (c) => ChannelScreen(channelId: ch['id']))),
+                    child: Container(
+                      width: 72, margin: const EdgeInsets.symmetric(horizontal: 6),
+                      child: Column(
+                        children: [
+                          CircleAvatar(radius: 28, backgroundImage: NetworkImage(ch['thumbnail']), backgroundColor: Colors.grey[800]),
+                          const SizedBox(height: 6),
+                          Text(ch['title'], style: const TextStyle(color: Colors.white, fontSize: 10), maxLines: 1, overflow: TextOverflow.ellipsis, textAlign: TextAlign.center)
+                        ],
+                      ),
+                    ),
+                  );
+                },
+              ),
+            ),
+            
+          // 🌟 नीचे की वीडियोज़ (इनफिनिट स्क्रॉल के साथ) 🌟
+          Expanded(
+            child: NotificationListener<ScrollNotification>(
+              onNotification: (ScrollNotification scrollInfo) {
+                if (!_isLoadingMoreSubs && scrollInfo.metrics.pixels >= scrollInfo.metrics.maxScrollExtent - 800) {
+                  _loadSubscriptions(isRefresh: false); 
+                }
+                return true;
+              },
+              child: ListView.builder(
+                itemCount: _subscriptionsData.length + (_isLoadingMoreSubs ? 1 : 0), 
+                itemBuilder: (context, index) { 
+                  if (index == _subscriptionsData.length) return const Padding(padding: EdgeInsets.all(20.0), child: Center(child: CircularProgressIndicator(color: Colors.red)));
+                  final data = _subscriptionsData[index]; 
+                  return _buildVideoCard(data['id'], data['title'], data['thumbnail'], "${data['author']} • ${_formatViews(data['views'])} views • ${_formatExactDate(data['date'])}", data['durationStr'], false, data['channelId'], ""); 
+                }
+              ),
+            ),
+          ),
+        ],
       );
     } 
+    
     // 🕒 टैब 2: History
     else if (_selectedIndex == 2) {
       if (_historyData.isEmpty) return const Center(child: Column(mainAxisAlignment: MainAxisAlignment.center, children: [Icon(Icons.history, size: 60, color: Colors.grey), SizedBox(height: 10), Text("History is empty", style: TextStyle(color: Colors.grey, fontSize: 16))]));
-      return ListView.builder(
-        itemCount: _historyData.length, 
-        itemBuilder: (context, index) { 
-          final data = _historyData[index]; 
-          return _buildVideoCard(data['id'], data['title'], 'https://img.youtube.com/vi/${data['id']}/hqdefault.jpg', "History", _formatDuration(data['position'] ?? 0), true, data['channelId'] ?? '', data['channelLogo'] ?? ''); 
-        }
-      );
+      return ListView.builder(itemCount: _historyData.length, itemBuilder: (context, index) { final data = _historyData[index]; return _buildVideoCard(data['id'], data['title'], 'https://img.youtube.com/vi/${data['id']}/hqdefault.jpg', "History", _formatDuration(data['position'] ?? 0), true, data['channelId'] ?? '', data['channelLogo'] ?? ''); });
     } 
+    
     // ⌚ टैब 3: Watch Later 
     else if (_selectedIndex == 3) {
       if (_watchLaterData.isEmpty) return const Center(child: Column(mainAxisAlignment: MainAxisAlignment.center, children: [Icon(Icons.watch_later_outlined, size: 60, color: Colors.grey), SizedBox(height: 10), Text("No videos in Watch Later", style: TextStyle(color: Colors.grey, fontSize: 16))]));
-      return ListView.builder(
-        itemCount: _watchLaterData.length, 
-        itemBuilder: (context, index) { 
-          final data = _watchLaterData[index]; 
-          return _buildVideoCard(data['id'], data['title'], 'https://img.youtube.com/vi/${data['id']}/hqdefault.jpg', "Saved in Watch Later", "", false, "", ""); 
-        }
-      );
+      return ListView.builder(itemCount: _watchLaterData.length, itemBuilder: (context, index) { final data = _watchLaterData[index]; return _buildVideoCard(data['id'], data['title'], 'https://img.youtube.com/vi/${data['id']}/hqdefault.jpg', "Saved in Watch Later", "", false, "", ""); });
     }
     return Container();
   }
@@ -325,7 +367,7 @@ class _YouTubeHomeScreenState extends State<YouTubeHomeScreen> {
   Widget _buildVideoCard(String videoId, String title, String imageUrl, String subtitleText, String durationText, bool isHistory, String channelId, String channelLogoUrl) {
     return GestureDetector(
       onTap: () => Navigator.push(context, MaterialPageRoute(builder: (context) => VideoPlayerScreen(videoId: videoId, title: title))).then((_) { 
-        if (_selectedIndex == 1) _loadSubscriptions();
+        if (_selectedIndex == 1) _loadSubscriptions(isRefresh: true);
         if (_selectedIndex == 2) _loadHistory(); 
         if (_selectedIndex == 3) _loadWatchLater();
       }),
@@ -346,9 +388,7 @@ class _YouTubeHomeScreenState extends State<YouTubeHomeScreen> {
               child: Row(
                 children: [
                   GestureDetector(
-                    onTap: () {
-                      if (channelId.isNotEmpty) Navigator.push(context, MaterialPageRoute(builder: (c) => ChannelScreen(channelId: channelId)));
-                    }, 
+                    onTap: () { if (channelId.isNotEmpty) Navigator.push(context, MaterialPageRoute(builder: (c) => ChannelScreen(channelId: channelId))); }, 
                     child: CircleAvatar(backgroundColor: Colors.grey[800], backgroundImage: channelLogoUrl.isNotEmpty ? NetworkImage(channelLogoUrl) : null, child: channelLogoUrl.isEmpty ? const Icon(Icons.person, color: Colors.white) : null)
                   ), 
                   const SizedBox(width: 12), 
