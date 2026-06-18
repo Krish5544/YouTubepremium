@@ -11,12 +11,12 @@ jobs:
           
       - run: flutter create --project-name protube_app . 
       
-      # 🌐 सिर्फ इंटरनेट परमिशन वाला कमांड (यह ज़रूरी है)
+      # 🌐 सिर्फ इंटरनेट परमिशन
       - run: sed -i 's/<application/<uses-permission android:name="android.permission.INTERNET"\/>\n    <application/g' android/app/src/main/AndroidManifest.xml
       
       - run: flutter pub get
       
-      # 🥷 बस एक इकलौता सेफ फिक्स (InAppWebView ProGuard के लिए)
+      # 🥷 InAppWebView ProGuard फिक्स
       - name: Fix Proguard Error
         run: find /home/runner/.pub-cache/hosted/pub.dev/ -type f -name "build.gradle*" -path "*/flutter_inappwebview*/android/build.gradle*" -exec sed -i 's/proguard-android.txt/proguard-android-optimize.txt/g' {} +
       
