@@ -30,7 +30,10 @@ class _VideoPlayerScreenState extends State<VideoPlayerScreen> {
   bool _isNavigatingToNext = false; 
   bool _isFullScreenState = false;
 
-  // 🌟 MX Player जेस्चर के वेरिएबल्स 🌟
+  // 🌟 Save फीचर का वेरिएबल
+  bool _isSaved = false;
+
+  // MX Player जेस्चर के वेरिएबल्स
   double _volume = 0.5;
   double _brightness = 0.5;
   bool _showIndicator = false;
@@ -44,16 +47,58 @@ class _VideoPlayerScreenState extends State<VideoPlayerScreen> {
     _initPlayer();
     _fetchRelatedVideos();
     _initGestures();
+    _checkIfSaved(); // 🌟 चेक करेगा कि वीडियो पहले से सेव है या नहीं
   }
 
-  // 🌟 हार्डवेयर से आवाज़ और रोशनी मंगाना 🌟
+  // 🌟 चेक करने का फंक्शन कि वीडियो सेव है या नहीं
+  Future<void> _checkIfSaved() async {
+    final prefs = await SharedPreferences.getInstance();
+    List<String> savedList = prefs.getStringList('saved_videos') ?? [];
+    bool exists = false;
+    for (String item in savedList) {
+      try {
+        if (jsonDecode(item)['id'] == widget.videoId) {
+          exists = true;
+          break;
+        }
+      } catch(e) {}
+    }
+    if (mounted) setState(() => _isSaved = exists);
+  }
+
+  // 🌟 वीडियो को लोकल तिजोरी में सेव/अनसेव करने का फंक्शन 🌟
+  Future<void> _toggleSaveVideo() async {
+    final prefs = await SharedPreferences.getInstance();
+    List<String> savedList = prefs.getStringList('saved_videos') ?? [];
+    
+    Map<String, dynamic> videoData = {
+      'id': widget.videoId,
+      'title': widget.title,
+    };
+    String videoJson = jsonEncode(videoData);
+
+    if (_isSaved) {
+      savedList.removeWhere((item) {
+        try { return jsonDecode(item)['id'] == widget.videoId; } catch(e) { return false; }
+      });
+      if (mounted) setState(() => _isSaved = false);
+      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text("वीडियो हटा दी गई", style: TextStyle(color: Colors.white)), backgroundColor: Colors.red));
+    } else {
+      savedList.removeWhere((item) {
+        try { return jsonDecode(item)['id'] == widget.videoId; } catch(e) { return false; }
+      });
+      savedList.insert(0, videoJson);
+      if (mounted) setState(() => _isSaved = true);
+      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text("वीडियो सेव हो गई", style: TextStyle(color: Colors.white)), backgroundColor: Colors.green));
+    }
+    prefs.setStringList('saved_videos', savedList);
+  }
+
   Future<void> _initGestures() async {
     try {
-      // सिस्टम का डिफ़ॉल्ट वॉल्यूम पॉपअप बंद कर रहे हैं ताकि हमारा खुद का डिज़ाइन दिखे
       await FlutterVolumeController.updateShowSystemUI(false);
       double? initVol = await FlutterVolumeController.getVolume();
       if (initVol != null && mounted) setState(() => _volume = initVol);
-      
       double initBright = await ScreenBrightness().current;
       if (mounted) setState(() => _brightness = initBright);
     } catch (e) {
@@ -65,7 +110,6 @@ class _VideoPlayerScreenState extends State<VideoPlayerScreen> {
     try {
       String query = Uri.encodeComponent(widget.title.split(' ').take(3).join(' '));
       String url = 'https://www.googleapis.com/youtube/v3/search?part=snippet&maxResults=15&q=$query&type=video&key=$apiKey';
-
       var res = await http.get(Uri.parse(url));
       var data = jsonDecode(res.body);
       List items = data['items'] ?? [];
@@ -74,21 +118,13 @@ class _VideoPlayerScreenState extends State<VideoPlayerScreen> {
       for (var item in items) {
         if (item['id']['videoId'] != widget.videoId) {
           newResults.add({
-            'id': item['id']['videoId'],
-            'title': item['snippet']['title'],
+            'id': item['id']['videoId'], 'title': item['snippet']['title'],
             'thumbnail': item['snippet']['thumbnails']['high']?['url'] ?? '',
-            'channel': item['snippet']['channelTitle'],
-            'date': item['snippet']['publishedAt'],
+            'channel': item['snippet']['channelTitle'], 'date': item['snippet']['publishedAt'],
           });
         }
       }
-      
-      if (mounted) {
-        setState(() {
-          _relatedVideos = newResults;
-          _isLoadingRelated = false;
-        });
-      }
+      if (mounted) setState(() { _relatedVideos = newResults; _isLoadingRelated = false; });
     } catch (e) {
       if (mounted) setState(() => _isLoadingRelated = false);
     }
@@ -97,7 +133,6 @@ class _VideoPlayerScreenState extends State<VideoPlayerScreen> {
   Future<void> _initPlayer() async {
     final prefs = await SharedPreferences.getInstance();
     int startPosition = 0;
-    
     try {
       List<String> historyList = prefs.getStringList('video_history') ?? [];
       for (String item in historyList) {
@@ -107,24 +142,17 @@ class _VideoPlayerScreenState extends State<VideoPlayerScreen> {
           break;
         }
       }
-    } catch (e) {
-      debugPrint("History load error: $e");
-    }
+    } catch (e) { }
 
     _controller = YoutubePlayerController(
       initialVideoId: widget.videoId,
-      flags: YoutubePlayerFlags(
-        autoPlay: true,
-        mute: false,
-        startAt: startPosition, 
-      ),
+      flags: YoutubePlayerFlags(autoPlay: true, mute: false, startAt: startPosition),
     )..addListener(_videoListener);
 
     if (mounted) setState(() => _isPlayerReady = true);
   }
 
   void _videoListener() async {
-    // 🌟 फुल-स्क्रीन को खुद से मैनेज करना (मक्खन की तरह) 🌟
     if (_controller.value.isFullScreen != _isFullScreenState) {
       _isFullScreenState = _controller.value.isFullScreen;
       if (_isFullScreenState) {
@@ -170,11 +198,10 @@ class _VideoPlayerScreenState extends State<VideoPlayerScreen> {
     _controller.dispose();
     SystemChrome.setPreferredOrientations([DeviceOrientation.portraitUp]);
     SystemChrome.setEnabledSystemUIMode(SystemUiMode.edgeToEdge);
-    FlutterVolumeController.updateShowSystemUI(true); // सिस्टम UI वापस चालू
+    FlutterVolumeController.updateShowSystemUI(true);
     super.dispose();
   }
 
-  // 🌟 आवाज़ कम/ज़्यादा करने का फंक्शन 🌟
   void _changeVolume(double delta) {
     setState(() {
       _volume += delta;
@@ -189,7 +216,6 @@ class _VideoPlayerScreenState extends State<VideoPlayerScreen> {
     _indicatorTimer = Timer(const Duration(seconds: 2), () { if (mounted) setState(() => _showIndicator = false); });
   }
 
-  // 🌟 रोशनी कम/ज़्यादा करने का फंक्शन 🌟
   void _changeBrightness(double delta) {
     setState(() {
       _brightness += delta;
@@ -216,16 +242,14 @@ class _VideoPlayerScreenState extends State<VideoPlayerScreen> {
     } catch(e) { return ""; }
   }
 
-  // 🌟 यह है हमारा जादुई शीशा (MX Player Gesture Overlay) 🌟
   Widget _buildGestureOverlay() {
     return Column(
       children: [
-        // ऊपर का 80% हिस्सा जेस्चर के लिए
+        Navigator.canPop(context) ? const SizedBox() : const SizedBox(),
         Expanded(
           flex: 8,
           child: Row(
             children: [
-              // लेफ्ट साइड: ब्राइटनेस
               Expanded(
                 flex: 3,
                 child: GestureDetector(
@@ -240,9 +264,7 @@ class _VideoPlayerScreenState extends State<VideoPlayerScreen> {
                   child: Container(),
                 ),
               ),
-              // बीच का हिस्सा: वीडियो को रोकने/चलाने के लिए (खाली छोड़ दिया)
               Expanded(flex: 4, child: IgnorePointer(child: Container())),
-              // राइट साइड: वॉल्यूम
               Expanded(
                 flex: 3,
                 child: GestureDetector(
@@ -260,7 +282,6 @@ class _VideoPlayerScreenState extends State<VideoPlayerScreen> {
             ],
           ),
         ),
-        // नीचे का 20% हिस्सा: सीक-बार (Seekbar) को आगे-पीछे करने के लिए खाली छोड़ दिया
         Expanded(flex: 2, child: IgnorePointer(child: Container())),
       ],
     );
@@ -272,13 +293,9 @@ class _VideoPlayerScreenState extends State<VideoPlayerScreen> {
 
     return WillPopScope(
       onWillPop: () async {
-        if (_isFullScreenState) {
-          _controller.toggleFullScreenMode();
-          return false; 
-        }
+        if (_isFullScreenState) { _controller.toggleFullScreenMode(); return false; }
         return true; 
       },
-      // 🌟 असली जादू: OrientationBuilder जो वीडियो को घुमाता है 🌟
       child: OrientationBuilder(
         builder: (context, orientation) {
           bool isLandscape = orientation == Orientation.landscape;
@@ -292,10 +309,7 @@ class _VideoPlayerScreenState extends State<VideoPlayerScreen> {
                 progressColors: const ProgressBarColors(playedColor: Colors.red, handleColor: Colors.redAccent),
                 bottomActions: const [CurrentPosition(), ProgressBar(isExpanded: true), RemainingDuration(), FullScreenButton()],
               ),
-              // जादुई शीशा सिर्फ फुल-स्क्रीन में दिखेगा 
               if (isLandscape) Positioned.fill(child: _buildGestureOverlay()),
-              
-              // बीच में आने वाला प्यारा सा इंडिकेटर
               if (_showIndicator && isLandscape)
                 Container(
                   padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 16),
@@ -316,10 +330,10 @@ class _VideoPlayerScreenState extends State<VideoPlayerScreen> {
             backgroundColor: const Color(0xFF0F0F0F),
             body: SafeArea(
               child: isLandscape 
-                ? Center(child: playerWidget) // फुल-स्क्रीन में सिर्फ प्लेयर
+                ? Center(child: playerWidget)
                 : Column(
                     children: [
-                      playerWidget, // नॉर्मल मोड में प्लेयर और नीचे लिस्ट
+                      playerWidget,
                       Expanded(
                         child: ListView(
                           padding: const EdgeInsets.symmetric(horizontal: 12.0, vertical: 14.0),
@@ -341,7 +355,14 @@ class _VideoPlayerScreenState extends State<VideoPlayerScreen> {
                                 children: [
                                   _buildPillButton(icon: Icons.thumb_up_outlined, label: "Like", onTap: () {}), const SizedBox(width: 8),
                                   _buildPillButton(icon: Icons.share_outlined, label: "Share", onTap: _shareVideo), const SizedBox(width: 8),
-                                  _buildPillButton(icon: Icons.download_outlined, label: "Download", onTap: () {}),
+                                  
+                                  // 🌟 सिर्फ 'Save' और 'Saved' बटन 🌟
+                                  _buildPillButton(
+                                    icon: _isSaved ? Icons.bookmark : Icons.bookmark_add_outlined, 
+                                    label: _isSaved ? "Saved" : "Save", 
+                                    onTap: _toggleSaveVideo,
+                                    iconColor: _isSaved ? Colors.blueAccent : Colors.white,
+                                  ),
                                 ],
                               ),
                             ),
@@ -380,8 +401,8 @@ class _VideoPlayerScreenState extends State<VideoPlayerScreen> {
     );
   }
 
-  Widget _buildPillButton({required IconData icon, required String label, required VoidCallback onTap}) {
-    return InkWell(onTap: onTap, borderRadius: BorderRadius.circular(20), child: Container(padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 7), decoration: BoxDecoration(color: Colors.white10, borderRadius: BorderRadius.circular(20)), child: Row(children: [Icon(icon, color: Colors.white, size: 18), const SizedBox(width: 6), Text(label, style: const TextStyle(color: Colors.white, fontSize: 12, fontWeight: FontWeight.bold))])));
+  Widget _buildPillButton({required IconData icon, required String label, required VoidCallback onTap, Color iconColor = Colors.white}) {
+    return InkWell(onTap: onTap, borderRadius: BorderRadius.circular(20), child: Container(padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 7), decoration: BoxDecoration(color: Colors.white10, borderRadius: BorderRadius.circular(20)), child: Row(children: [Icon(icon, color: iconColor, size: 18), const SizedBox(width: 6), Text(label, style: const TextStyle(color: Colors.white, fontSize: 12, fontWeight: FontWeight.bold))])));
   }
 
   Widget _buildRealRelatedVideo(Map<String, dynamic> video) {
