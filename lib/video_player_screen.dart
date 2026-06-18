@@ -30,8 +30,8 @@ class _VideoPlayerScreenState extends State<VideoPlayerScreen> {
   bool _isNavigatingToNext = false; 
   bool _isFullScreenState = false;
 
-  // 🌟 Save फीचर का वेरिएबल
-  bool _isSaved = false;
+  // 🌟 Watch Later का वेरिएबल (बिना किसी लोडिंग के) 🌟
+  bool _isInWatchLater = false;
 
   // MX Player जेस्चर के वेरिएबल्स
   double _volume = 0.5;
@@ -47,29 +47,25 @@ class _VideoPlayerScreenState extends State<VideoPlayerScreen> {
     _initPlayer();
     _fetchRelatedVideos();
     _initGestures();
-    _checkIfSaved(); // 🌟 चेक करेगा कि वीडियो पहले से सेव है या नहीं
+    _checkIfWatchLater(); 
   }
 
-  // 🌟 चेक करने का फंक्शन कि वीडियो सेव है या नहीं
-  Future<void> _checkIfSaved() async {
+  Future<void> _checkIfWatchLater() async {
     final prefs = await SharedPreferences.getInstance();
-    List<String> savedList = prefs.getStringList('saved_videos') ?? [];
+    List<String> savedList = prefs.getStringList('watch_later') ?? [];
     bool exists = false;
     for (String item in savedList) {
       try {
-        if (jsonDecode(item)['id'] == widget.videoId) {
-          exists = true;
-          break;
-        }
+        if (jsonDecode(item)['id'] == widget.videoId) { exists = true; break; }
       } catch(e) {}
     }
-    if (mounted) setState(() => _isSaved = exists);
+    if (mounted) setState(() => _isInWatchLater = exists);
   }
 
-  // 🌟 वीडियो को लोकल तिजोरी में सेव/अनसेव करने का फंक्शन 🌟
-  Future<void> _toggleSaveVideo() async {
+  // 🌟 एकदम इंस्टेंट 1 मिलीसेकंड वाला फंक्शन 🌟
+  Future<void> _toggleWatchLater() async {
     final prefs = await SharedPreferences.getInstance();
-    List<String> savedList = prefs.getStringList('saved_videos') ?? [];
+    List<String> savedList = prefs.getStringList('watch_later') ?? [];
     
     Map<String, dynamic> videoData = {
       'id': widget.videoId,
@@ -77,21 +73,21 @@ class _VideoPlayerScreenState extends State<VideoPlayerScreen> {
     };
     String videoJson = jsonEncode(videoData);
 
-    if (_isSaved) {
+    if (_isInWatchLater) {
       savedList.removeWhere((item) {
         try { return jsonDecode(item)['id'] == widget.videoId; } catch(e) { return false; }
       });
-      if (mounted) setState(() => _isSaved = false);
-      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text("वीडियो हटा दी गई", style: TextStyle(color: Colors.white)), backgroundColor: Colors.red));
+      if (mounted) setState(() => _isInWatchLater = false);
+      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text("Watch Later से हटा दिया गया", style: TextStyle(color: Colors.white)), backgroundColor: Colors.red));
     } else {
       savedList.removeWhere((item) {
         try { return jsonDecode(item)['id'] == widget.videoId; } catch(e) { return false; }
       });
       savedList.insert(0, videoJson);
-      if (mounted) setState(() => _isSaved = true);
-      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text("वीडियो सेव हो गई", style: TextStyle(color: Colors.white)), backgroundColor: Colors.green));
+      if (mounted) setState(() => _isInWatchLater = true);
+      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text("Watch Later में जोड़ दिया गया", style: TextStyle(color: Colors.white)), backgroundColor: Colors.green));
     }
-    prefs.setStringList('saved_videos', savedList);
+    prefs.setStringList('watch_later', savedList);
   }
 
   Future<void> _initGestures() async {
@@ -101,9 +97,7 @@ class _VideoPlayerScreenState extends State<VideoPlayerScreen> {
       if (initVol != null && mounted) setState(() => _volume = initVol);
       double initBright = await ScreenBrightness().current;
       if (mounted) setState(() => _brightness = initBright);
-    } catch (e) {
-      debugPrint("Gesture Init Error: $e");
-    }
+    } catch (e) { }
   }
 
   Future<void> _fetchRelatedVideos() async {
@@ -137,10 +131,7 @@ class _VideoPlayerScreenState extends State<VideoPlayerScreen> {
       List<String> historyList = prefs.getStringList('video_history') ?? [];
       for (String item in historyList) {
         Map<String, dynamic> data = jsonDecode(item);
-        if (data['id'] == widget.videoId) {
-          startPosition = data['position'] ?? 0;
-          break;
-        }
+        if (data['id'] == widget.videoId) { startPosition = data['position'] ?? 0; break; }
       }
     } catch (e) { }
 
@@ -356,12 +347,12 @@ class _VideoPlayerScreenState extends State<VideoPlayerScreen> {
                                   _buildPillButton(icon: Icons.thumb_up_outlined, label: "Like", onTap: () {}), const SizedBox(width: 8),
                                   _buildPillButton(icon: Icons.share_outlined, label: "Share", onTap: _shareVideo), const SizedBox(width: 8),
                                   
-                                  // 🌟 सिर्फ 'Save' और 'Saved' बटन 🌟
+                                  // 🌟 यहाँ हमने 'खाली' और 'भरे हुए' (सॉलिड) आइकन का लॉजिक लगाया है 🌟
                                   _buildPillButton(
-                                    icon: _isSaved ? Icons.bookmark : Icons.bookmark_add_outlined, 
-                                    label: _isSaved ? "Saved" : "Save", 
-                                    onTap: _toggleSaveVideo,
-                                    iconColor: _isSaved ? Colors.blueAccent : Colors.white,
+                                    icon: _isInWatchLater ? Icons.watch_later : Icons.watch_later_outlined, 
+                                    label: _isInWatchLater ? "Added" : "Watch Later", 
+                                    onTap: _toggleWatchLater,
+                                    iconColor: _isInWatchLater ? Colors.blueAccent : Colors.white,
                                   ),
                                 ],
                               ),
@@ -402,7 +393,21 @@ class _VideoPlayerScreenState extends State<VideoPlayerScreen> {
   }
 
   Widget _buildPillButton({required IconData icon, required String label, required VoidCallback onTap, Color iconColor = Colors.white}) {
-    return InkWell(onTap: onTap, borderRadius: BorderRadius.circular(20), child: Container(padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 7), decoration: BoxDecoration(color: Colors.white10, borderRadius: BorderRadius.circular(20)), child: Row(children: [Icon(icon, color: iconColor, size: 18), const SizedBox(width: 6), Text(label, style: const TextStyle(color: Colors.white, fontSize: 12, fontWeight: FontWeight.bold))])));
+    return InkWell(
+      onTap: onTap, 
+      borderRadius: BorderRadius.circular(20), 
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 7), 
+        decoration: BoxDecoration(color: Colors.white10, borderRadius: BorderRadius.circular(20)), 
+        child: Row(
+          children: [
+            Icon(icon, color: iconColor, size: 18), 
+            const SizedBox(width: 6), 
+            Text(label, style: const TextStyle(color: Colors.white, fontSize: 12, fontWeight: FontWeight.bold))
+          ]
+        )
+      )
+    );
   }
 
   Widget _buildRealRelatedVideo(Map<String, dynamic> video) {
