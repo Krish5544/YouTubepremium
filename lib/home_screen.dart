@@ -128,22 +128,16 @@ class _YouTubeHomeScreenState extends State<YouTubeHomeScreen> {
 
   @override
   Widget build(BuildContext context) {
-    // 🌟 WillPopScope: यह पूरी ऐप का ग्लोबल गार्ड है जो बैक बटन दबाने पर स्टेप-बाय-स्टेप पीछे लाएगा 🌟
     return WillPopScope(
       onWillPop: () async {
-        // 1. अगर यूज़र History या Subscriptions टैब पर है, तो पहले Home टैब (0) पर वापस लाओ
         if (_selectedIndex != 0) {
-          setState(() {
-            _selectedIndex = 0;
-          });
-          return false; // ऐप बंद मत करो
+          setState(() { _selectedIndex = 0; });
+          return false; 
         }
-        // 2. अगर यूज़र ने कुछ सर्च किया हुआ है और वह होम स्क्रीन पर है, तो डिफ़ॉल्ट मुख्य फ़ीड पर वापस लाओ
         if (currentQuery != "UPSSSC Lower PCS classes") {
           _loadResults("UPSSSC Lower PCS classes", isRefresh: true);
-          return false; // ऐप बंद मत करो
+          return false; 
         }
-        // 3. अगर सब कुछ पहले से ही डिफ़ॉल्ट है, तब ऐप बंद होने दो
         return true;
       },
       child: Scaffold(
@@ -171,15 +165,24 @@ class _YouTubeHomeScreenState extends State<YouTubeHomeScreen> {
   Widget _buildBody() {
     if (_selectedIndex == 0) {
       if (isLoading) return const Center(child: CircularProgressIndicator(color: Colors.red));
-      return ListView.builder(
-        itemCount: searchResults.length + (nextPageToken != null ? 1 : 0),
-        itemBuilder: (context, index) {
-          if (index == searchResults.length) return const Padding(padding: EdgeInsets.all(20.0), child: Center(child: CircularProgressIndicator(color: Colors.red)));
-          final item = searchResults[index];
-          if (item['type'] == 'channel') return ListTile(contentPadding: const EdgeInsets.all(16), leading: CircleAvatar(radius: 30, backgroundImage: NetworkImage(item['thumbnail'])), title: Text(item['title'], style: const TextStyle(color: Colors.white, fontSize: 18, fontWeight: FontWeight.bold)), subtitle: const Text("SUBSCRIBE", style: TextStyle(color: Colors.red)), onTap: () => Navigator.push(context, MaterialPageRoute(builder: (c) => ChannelScreen(channelId: item['id']))));
-          if (item['type'] == 'playlist') return ListTile(contentPadding: const EdgeInsets.all(8), leading: Stack(alignment: Alignment.centerRight, children: [Image.network(item['thumbnail'], width: 120, height: 80, fit: BoxFit.cover), Container(width: 40, height: 80, color: Colors.black.withOpacity(0.7), child: const Center(child: Icon(Icons.playlist_play, color: Colors.white)))]), title: Text(item['title'], style: const TextStyle(color: Colors.white, fontSize: 16)), subtitle: Text("Playlist • ${item['channel']}", style: const TextStyle(color: Colors.grey)), onTap: () => Navigator.push(context, MaterialPageRoute(builder: (c) => PlaylistScreen(playlistId: item['id'], playlistTitle: item['title']))));
-          return _buildVideoCard(item['id'], item['title'], item['thumbnail'], "${item['author']} • ${_formatViews(item['views'])} views • ${_formatExactDate(item['date'])}", item['durationStr'], false, item['channelId'], item['channelLogo']);
+      // 🌟 यह रहा हमारा इनफिनिट स्क्रॉल का नया जादुई फिक्स 🌟
+      return NotificationListener<ScrollNotification>(
+        onNotification: (ScrollNotification scrollInfo) {
+          if (!isLoadingMore && scrollInfo.metrics.pixels == scrollInfo.metrics.maxScrollExtent) {
+            _loadResults(currentQuery); 
+          }
+          return true;
         },
+        child: ListView.builder(
+          itemCount: searchResults.length + (nextPageToken != null ? 1 : 0),
+          itemBuilder: (context, index) {
+            if (index == searchResults.length) return const Padding(padding: EdgeInsets.all(20.0), child: Center(child: CircularProgressIndicator(color: Colors.red)));
+            final item = searchResults[index];
+            if (item['type'] == 'channel') return ListTile(contentPadding: const EdgeInsets.all(16), leading: CircleAvatar(radius: 30, backgroundImage: NetworkImage(item['thumbnail'])), title: Text(item['title'], style: const TextStyle(color: Colors.white, fontSize: 18, fontWeight: FontWeight.bold)), subtitle: const Text("SUBSCRIBE", style: TextStyle(color: Colors.red)), onTap: () => Navigator.push(context, MaterialPageRoute(builder: (c) => ChannelScreen(channelId: item['id']))));
+            if (item['type'] == 'playlist') return ListTile(contentPadding: const EdgeInsets.all(8), leading: Stack(alignment: Alignment.centerRight, children: [Image.network(item['thumbnail'], width: 120, height: 80, fit: BoxFit.cover), Container(width: 40, height: 80, color: Colors.black.withOpacity(0.7), child: const Center(child: Icon(Icons.playlist_play, color: Colors.white)))]), title: Text(item['title'], style: const TextStyle(color: Colors.white, fontSize: 16)), subtitle: Text("Playlist • ${item['channel']}", style: const TextStyle(color: Colors.grey)), onTap: () => Navigator.push(context, MaterialPageRoute(builder: (c) => PlaylistScreen(playlistId: item['id'], playlistTitle: item['title']))));
+            return _buildVideoCard(item['id'], item['title'], item['thumbnail'], "${item['author']} • ${_formatViews(item['views'])} views • ${_formatExactDate(item['date'])}", item['durationStr'], false, item['channelId'], item['channelLogo']);
+          },
+        ),
       );
     }
     return ListView.builder(itemCount: _historyData.length, itemBuilder: (context, index) { final data = _historyData[index]; return _buildVideoCard(data['id'], data['title'], 'https://img.youtube.com/vi/${data['id']}/hqdefault.jpg', "History", _formatDuration(data['position'] ?? 0), true, data['channelId'] ?? '', data['channelLogo'] ?? ''); });
