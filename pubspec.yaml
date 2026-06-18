@@ -15,8 +15,8 @@ dependencies:
   http: ^1.2.0
   share_plus: ^7.2.2
   
-  # 🌟 यह है एकदम नया और 100% सेफ पैकेज (पुराना perfect_volume उड़ा दिया गया है) 🌟
-  flutter_volume_controller: ^1.3.4
+  # 🌟 तुम्हारे कहे अनुसार एकदम लेटेस्ट और मॉडर्न पैकेजेस 🌟
+  flutter_volume_controller: ^2.0.1
   screen_brightness: ^2.1.1
 
 dev_dependencies:
