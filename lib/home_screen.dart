@@ -23,13 +23,17 @@ class _YouTubeHomeScreenState extends State<YouTubeHomeScreen> {
   bool isLoadingMore = false;
   String? nextPageToken;
   String currentQuery = "UPSSSC Lower PCS classes";
+  
+  // हिस्ट्री और वाच लेटर का डेटा
   List<Map<String, dynamic>> _historyData = [];
+  List<Map<String, dynamic>> _watchLaterData = [];
 
   @override
   void initState() {
     super.initState();
     _loadResults(currentQuery, isRefresh: true);
     _loadHistory(); 
+    _loadWatchLater(); // 🌟 ऐप खुलते ही Watch Later भी लोड होगा
   }
 
   Future<void> _loadResults(String query, {bool isRefresh = false}) async {
@@ -97,6 +101,13 @@ class _YouTubeHomeScreenState extends State<YouTubeHomeScreen> {
     setState(() => _historyData = historyList.map((item) => jsonDecode(item) as Map<String, dynamic>).toList());
   }
 
+  // 🌟 Watch Later लोड करने का जादुई फंक्शन 🌟
+  Future<void> _loadWatchLater() async {
+    final prefs = await SharedPreferences.getInstance();
+    List<String> savedList = prefs.getStringList('watch_later') ?? [];
+    setState(() => _watchLaterData = savedList.map((item) => jsonDecode(item) as Map<String, dynamic>).toList());
+  }
+
   int _parseDuration(String isoDuration) {
     RegExp reg = RegExp(r'PT(?:(\d+)H)?(?:(\d+)M)?(?:(\d+)S)?');
     var match = reg.firstMatch(isoDuration);
@@ -154,18 +165,32 @@ class _YouTubeHomeScreenState extends State<YouTubeHomeScreen> {
         ),
         body: _buildBody(),
         bottomNavigationBar: BottomNavigationBar(
-          backgroundColor: const Color(0xFF0F0F0F), selectedItemColor: Colors.white, unselectedItemColor: Colors.grey, currentIndex: _selectedIndex,
-          onTap: (i) { setState(() => _selectedIndex = i); if (i == 1) _loadHistory(); },
-          items: const [BottomNavigationBarItem(icon: Icon(Icons.home_filled), label: "Home"), BottomNavigationBarItem(icon: Icon(Icons.history), label: "History"), BottomNavigationBarItem(icon: Icon(Icons.subscriptions_outlined), label: "Subscriptions")],
+          backgroundColor: const Color(0xFF0F0F0F), 
+          selectedItemColor: Colors.white, 
+          unselectedItemColor: Colors.grey, 
+          currentIndex: _selectedIndex,
+          type: BottomNavigationBarType.fixed, // 4 टैब के लिए यह ज़रूरी है
+          onTap: (i) { 
+            setState(() => _selectedIndex = i); 
+            if (i == 2) _loadHistory(); 
+            if (i == 3) _loadWatchLater(); // 🌟 जब टैब 3 दबेगा तो Watch Later लोड होगा
+          },
+          items: const [
+            BottomNavigationBarItem(icon: Icon(Icons.home_filled), label: "Home"), 
+            BottomNavigationBarItem(icon: Icon(Icons.subscriptions_outlined), label: "Subscriptions"),
+            BottomNavigationBarItem(icon: Icon(Icons.history), label: "History"), 
+            // 🌟 यह रहा तुम्हारा नया Watch Later टैब 🌟
+            BottomNavigationBarItem(icon: Icon(Icons.watch_later_outlined), label: "Watch Later"), 
+          ],
         ),
       ),
     );
   }
 
   Widget _buildBody() {
+    // 🏠 टैब 0: Home Screen
     if (_selectedIndex == 0) {
       if (isLoading) return const Center(child: CircularProgressIndicator(color: Colors.red));
-      // 🌟 यह रहा हमारा इनफिनिट स्क्रॉल का नया जादुई फिक्स 🌟
       return NotificationListener<ScrollNotification>(
         onNotification: (ScrollNotification scrollInfo) {
           if (!isLoadingMore && scrollInfo.metrics.pixels == scrollInfo.metrics.maxScrollExtent) {
@@ -184,14 +209,83 @@ class _YouTubeHomeScreenState extends State<YouTubeHomeScreen> {
           },
         ),
       );
+    } 
+    // 📺 टैब 1: Subscriptions (Coming Soon)
+    else if (_selectedIndex == 1) {
+      return const Center(child: Text("Subscriptions (Coming Soon)", style: TextStyle(color: Colors.white, fontSize: 16)));
+    } 
+    // 🕒 टैब 2: History
+    else if (_selectedIndex == 2) {
+      if (_historyData.isEmpty) return const Center(child: Text("History is empty", style: TextStyle(color: Colors.grey)));
+      return ListView.builder(
+        itemCount: _historyData.length, 
+        itemBuilder: (context, index) { 
+          final data = _historyData[index]; 
+          return _buildVideoCard(data['id'], data['title'], 'https://img.youtube.com/vi/${data['id']}/hqdefault.jpg', "History", _formatDuration(data['position'] ?? 0), true, data['channelId'] ?? '', data['channelLogo'] ?? ''); 
+        }
+      );
+    } 
+    // ⌚ टैब 3: Watch Later 
+    else if (_selectedIndex == 3) {
+      if (_watchLaterData.isEmpty) return const Center(child: Column(mainAxisAlignment: MainAxisAlignment.center, children: [Icon(Icons.watch_later_outlined, size: 60, color: Colors.grey), SizedBox(height: 10), Text("No videos in Watch Later", style: TextStyle(color: Colors.grey, fontSize: 16))]));
+      return ListView.builder(
+        itemCount: _watchLaterData.length, 
+        itemBuilder: (context, index) { 
+          final data = _watchLaterData[index]; 
+          // Watch later के कार्ड में हमने 'Saved' लिखा है ताकि अच्छा लगे
+          return _buildVideoCard(data['id'], data['title'], 'https://img.youtube.com/vi/${data['id']}/hqdefault.jpg', "Saved in Watch Later", "", false, "", ""); 
+        }
+      );
     }
-    return ListView.builder(itemCount: _historyData.length, itemBuilder: (context, index) { final data = _historyData[index]; return _buildVideoCard(data['id'], data['title'], 'https://img.youtube.com/vi/${data['id']}/hqdefault.jpg', "History", _formatDuration(data['position'] ?? 0), true, data['channelId'] ?? '', data['channelLogo'] ?? ''); });
+    return Container();
   }
 
   Widget _buildVideoCard(String videoId, String title, String imageUrl, String subtitleText, String durationText, bool isHistory, String channelId, String channelLogoUrl) {
     return GestureDetector(
-      onTap: () => Navigator.push(context, MaterialPageRoute(builder: (context) => VideoPlayerScreen(videoId: videoId, title: title))).then((_) { if (_selectedIndex == 1) _loadHistory(); }),
-      child: Padding(padding: const EdgeInsets.only(bottom: 15.0), child: Column(children: [Stack(alignment: Alignment.bottomRight, children: [Image.network(imageUrl, height: 220, width: double.infinity, fit: BoxFit.cover), Container(margin: const EdgeInsets.all(8), padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 2), color: Colors.black.withOpacity(0.8), child: Text(durationText, style: const TextStyle(color: Colors.white, fontSize: 12)))]), Padding(padding: const EdgeInsets.fromLTRB(12, 12, 12, 0), child: Row(children: [GestureDetector(onTap: () => Navigator.push(context, MaterialPageRoute(builder: (c) => ChannelScreen(channelId: channelId))), child: CircleAvatar(backgroundColor: Colors.grey[800], backgroundImage: channelLogoUrl.isNotEmpty ? NetworkImage(channelLogoUrl) : null, child: channelLogoUrl.isEmpty ? const Icon(Icons.person, color: Colors.white) : null)), const SizedBox(width: 12), Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [Text(title, style: const TextStyle(color: Colors.white, fontSize: 15), maxLines: 2, overflow: TextOverflow.ellipsis), const SizedBox(height: 4), Text(isHistory ? "आपने $durationText तक देखा" : subtitleText, style: const TextStyle(color: Colors.grey, fontSize: 12))]))]))])),
+      onTap: () => Navigator.push(context, MaterialPageRoute(builder: (context) => VideoPlayerScreen(videoId: videoId, title: title))).then((_) { 
+        // 🌟 जब वीडियो से वापस आएँगे, तो लिस्ट ऑटोमैटिक रिफ्रेश होगी
+        if (_selectedIndex == 2) _loadHistory(); 
+        if (_selectedIndex == 3) _loadWatchLater();
+      }),
+      child: Padding(
+        padding: const EdgeInsets.only(bottom: 15.0), 
+        child: Column(
+          children: [
+            Stack(
+              alignment: Alignment.bottomRight, 
+              children: [
+                Image.network(imageUrl, height: 220, width: double.infinity, fit: BoxFit.cover), 
+                if (durationText.isNotEmpty) // अगर duration खाली है (जैसे Watch Later में), तो डब्बा नहीं दिखेगा
+                  Container(margin: const EdgeInsets.all(8), padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 2), color: Colors.black.withOpacity(0.8), child: Text(durationText, style: const TextStyle(color: Colors.white, fontSize: 12)))
+              ]
+            ), 
+            Padding(
+              padding: const EdgeInsets.fromLTRB(12, 12, 12, 0), 
+              child: Row(
+                children: [
+                  GestureDetector(
+                    onTap: () {
+                      if (channelId.isNotEmpty) Navigator.push(context, MaterialPageRoute(builder: (c) => ChannelScreen(channelId: channelId)));
+                    }, 
+                    child: CircleAvatar(backgroundColor: Colors.grey[800], backgroundImage: channelLogoUrl.isNotEmpty ? NetworkImage(channelLogoUrl) : null, child: channelLogoUrl.isEmpty ? const Icon(Icons.person, color: Colors.white) : null)
+                  ), 
+                  const SizedBox(width: 12), 
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start, 
+                      children: [
+                        Text(title, style: const TextStyle(color: Colors.white, fontSize: 15), maxLines: 2, overflow: TextOverflow.ellipsis), 
+                        const SizedBox(height: 4), 
+                        Text(isHistory ? "आपने $durationText तक देखा" : subtitleText, style: const TextStyle(color: Colors.grey, fontSize: 12))
+                      ]
+                    )
+                  )
+                ]
+              )
+            )
+          ]
+        )
+      ),
     );
   }
 }
