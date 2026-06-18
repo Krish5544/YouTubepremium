@@ -2,7 +2,7 @@ import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:youtube_player_flutter/youtube_player_flutter.dart';
 import 'package:shared_preferences/shared_preferences.dart';
-import 'package:share_plus/share_plus.dart'; // 🌟 शेयर पैकेज एकदम सुरक्षित है
+import 'package:share_plus/share_plus.dart'; 
 
 class VideoPlayerScreen extends StatefulWidget {
   final String videoId;
@@ -17,7 +17,6 @@ class _VideoPlayerScreenState extends State<VideoPlayerScreen> {
   late YoutubePlayerController _controller;
   bool _isPlayerReady = false;
   
-  // 🌟 डिस्क्रिप्शन को छोटा-बड़ा करने का स्टेट वेरिएबल
   bool _isDescriptionExpanded = false;
 
   @override
@@ -92,7 +91,6 @@ class _VideoPlayerScreenState extends State<VideoPlayerScreen> {
     super.dispose();
   }
 
-  // 🌟 शेयर करने का मास्टर फंक्शन
   void _shareVideo() {
     final String youtubeLink = 'https://youtu.be/${widget.videoId}';
     Share.share('इस शानदार वीडियो को ProTube पर देखें:\n${widget.title}\n\nलिंक: $youtubeLink');
@@ -107,7 +105,6 @@ class _VideoPlayerScreenState extends State<VideoPlayerScreen> {
       );
     }
 
-    // ग्लोबल बैक बटन गार्ड
     return WillPopScope(
       onWillPop: () async {
         if (_controller.value.isFullScreen) {
@@ -137,15 +134,11 @@ class _VideoPlayerScreenState extends State<VideoPlayerScreen> {
             body: SafeArea(
               child: Column(
                 children: [
-                  // 1. वीडियो प्लेयर (टॉप पर फिक्स)
                   player,
-                  
-                  // 2. नीचे का पूरा स्क्रॉल होने वाला हिस्सा
                   Expanded(
                     child: ListView(
                       padding: const EdgeInsets.symmetric(horizontal: 12.0, vertical: 14.0),
                       children: [
-                        // 🎥 वीडियो का टाइटल
                         Text(
                           widget.title,
                           style: const TextStyle(color: Colors.white, fontSize: 17, fontWeight: FontWeight.bold, height: 1.3),
@@ -153,15 +146,12 @@ class _VideoPlayerScreenState extends State<VideoPlayerScreen> {
                           overflow: TextOverflow.ellipsis,
                         ),
                         const SizedBox(height: 6),
-                        
-                        // व्यूज और टाइम की डमी लाइन
                         const Text(
                           "120K views • 2 days ago",
                           style: TextStyle(color: Colors.grey, fontSize: 12),
                         ),
                         const SizedBox(height: 12),
                         
-                        // 🤝 1. चैनल नाम और सब्सक्राइब बटन रो (Row)
                         Row(
                           children: [
                             const CircleAvatar(
@@ -191,30 +181,25 @@ class _VideoPlayerScreenState extends State<VideoPlayerScreen> {
                         ),
                         const SizedBox(height: 14),
                         
-                        // 🚀 2. यूट्यूब स्टाइल एक्शन बार (लाइक, शेयर, डाउनलोड)
                         SingleChildScrollView(
                           scrollDirection: Axis.horizontal,
                           child: Row(
                             children: [
-                              // लाइक बटन (पिल शेप)
+                              // 🌟 यहाँ पर स्पेलिंग फिक्स कर दी गई है 🌟
                               _buildPillButton(
-                                icon: Icons.thumb_up_out_outlined,
+                                icon: Icons.thumb_up_outlined, 
                                 label: "15K",
                                 onTap: () {},
                               ),
                               const SizedBox(width: 8),
-                              
-                              // 🌟 हमारा असली काम करने वाला 'Share' बटन 🌟
                               _buildPillButton(
                                 icon: Icons.share_outlined,
                                 label: "Share",
-                                onTap: _shareVideo, // क्लिक करते ही शेयर फंक्शन कॉल होगा
+                                onTap: _shareVideo, 
                               ),
                               const SizedBox(width: 8),
-                              
-                              // डाउनलोड बटन (पिल शेप)
                               _buildPillButton(
-                                icon: Icons.vertical_align_bottom_outlined,
+                                icon: Icons.download_outlined, 
                                 label: "Download",
                                 onTap: () {},
                               ),
@@ -223,7 +208,6 @@ class _VideoPlayerScreenState extends State<VideoPlayerScreen> {
                         ),
                         const SizedBox(height: 14),
                         
-                        // 📝 3. स्मार्ट और एक्सपेंडेबल डिस्क्रिप्शन बॉक्स
                         GestureDetector(
                           onTap: () {
                             setState(() {
@@ -262,7 +246,6 @@ class _VideoPlayerScreenState extends State<VideoPlayerScreen> {
                         const Divider(color: Colors.white12, thickness: 1),
                         const SizedBox(height: 10),
                         
-                        // 'Up Next' या रिलेटेड वीडियोज़ की हेडिंग
                         const Text("Up next", style: TextStyle(color: Colors.white, fontSize: 15, fontWeight: FontWeight.bold)),
                         const SizedBox(height: 14),
                         ...List.generate(6, (index) => _buildDummyRelatedVideo()),
@@ -278,7 +261,6 @@ class _VideoPlayerScreenState extends State<VideoPlayerScreen> {
     );
   }
 
-  // यूट्यूब स्टाइल पिल बटन्स बनाने का सुंदर विजेट
   Widget _buildPillButton({required IconData icon, required String label, required VoidCallback onTap}) {
     return InkWell(
       onTap: onTap,
@@ -300,7 +282,6 @@ class _VideoPlayerScreenState extends State<VideoPlayerScreen> {
     );
   }
 
-  // डमी वीडियोज़ का डिज़ाइन
   Widget _buildDummyRelatedVideo() {
     return Padding(
       padding: const EdgeInsets.only(bottom: 16.0),
