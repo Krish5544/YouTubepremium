@@ -15,9 +15,8 @@ dependencies:
   http: ^1.2.0
   share_plus: ^7.2.2
   
-  # 🌟 MX Player जेस्चर्स के लिए 2 जादुई पैकेजेस 🌟
-  volume_controller: ^2.0.7
-  # ⬇️ यहाँ गिटहब की माँग के अनुसार वर्ज़न 2.1.1 कर दिया गया है ⬇️
+  # 🌟 स्मार्ट और मॉडर्न पैकेजेस (कोई पुरानी एरर नहीं देंगे) 🌟
+  perfect_volume_control: ^2.1.2
   screen_brightness: ^2.1.1
 
 dev_dependencies:
