@@ -15,8 +15,8 @@ dependencies:
   http: ^1.2.0
   share_plus: ^7.2.2
   
-  # 🌟 स्मार्ट और मॉडर्न पैकेजेस (कोई पुरानी एरर नहीं देंगे) 🌟
-  perfect_volume_control: ^2.1.2
+  # 🌟 एकदम सही और स्टेबल वर्ज़न (GitHub की सलाह के अनुसार) 🌟
+  perfect_volume_control: ^1.0.6
   screen_brightness: ^2.1.1
 
 dev_dependencies:
