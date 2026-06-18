@@ -240,11 +240,62 @@ class _YouTubeHomeScreenState extends State<YouTubeHomeScreen> {
       child: Scaffold(
         backgroundColor: const Color(0xFF0F0F0F),
         appBar: AppBar(
-          backgroundColor: const Color(0xFF0F0F0F), elevation: 0, leadingWidth: 120,
-          leading: Padding(padding: const EdgeInsets.only(left: 12.0), child: Image.network('https://upload.wikimedia.org/wikipedia/commons/thumb/b/b8/YouTube_Logo_2017.svg/512px-YouTube_Logo_2017.svg.png', fit: BoxFit.contain)),
+          backgroundColor: const Color(0xFF0F0F0F),
+          elevation: 0,
+          titleSpacing: 12.0,
+          title: Row(
+            children: [
+              // 🌟 प्रीमियम ProTube लोगो 🌟
+              RichText(
+                text: const TextSpan(
+                  style: TextStyle(fontSize: 22, fontWeight: FontWeight.bold, letterSpacing: -0.5),
+                  children: [
+                    TextSpan(text: 'Pro', style: TextStyle(color: Colors.white)),
+                    TextSpan(text: 'Tube', style: TextStyle(color: Colors.red)),
+                  ],
+                ),
+              ),
+              const SizedBox(width: 16),
+              
+              // 🌟 गूगल स्टाइल स्लीक सर्च बार 🌟
+              Expanded(
+                child: GestureDetector(
+                  onTap: () => showSearch(context: context, delegate: VideoSearchDelegate((q) => _loadResults(q, isRefresh: true))),
+                  child: Container(
+                    height: 38,
+                    padding: const EdgeInsets.symmetric(horizontal: 12),
+                    decoration: BoxDecoration(
+                      color: Colors.white10,
+                      borderRadius: BorderRadius.circular(20),
+                    ),
+                    child: Row(
+                      children: const [
+                        Icon(Icons.search, color: Colors.grey, size: 18),
+                        SizedBox(width: 8),
+                        Text("Search", style: TextStyle(color: Colors.grey, fontSize: 15)),
+                      ],
+                    ),
+                  ),
+                ),
+              ),
+            ],
+          ),
           actions: [
-            Container(margin: const EdgeInsets.symmetric(horizontal: 8, vertical: 8), decoration: BoxDecoration(color: Colors.grey[800], shape: BoxShape.circle), child: IconButton(icon: const Icon(Icons.search, color: Colors.white, size: 22), onPressed: () => showSearch(context: context, delegate: VideoSearchDelegate((q) => _loadResults(q, isRefresh: true))))),
-            const Padding(padding: EdgeInsets.only(right: 12.0, left: 4.0), child: CircleAvatar(radius: 14, backgroundColor: Colors.deepPurple, child: Text("K", style: TextStyle(fontSize: 14, color: Colors.white))))
+            Padding(
+              padding: const EdgeInsets.only(right: 12.0, left: 8.0),
+              child: Center(
+                child: GestureDetector(
+                  onTap: () {
+                    // यहाँ बाद में प्रोफाइल/सेटिंग्स मेन्यू खुलेगा
+                  },
+                  child: const CircleAvatar(
+                    radius: 14, 
+                    backgroundColor: Colors.deepPurple, 
+                    child: Text("K", style: TextStyle(fontSize: 14, color: Colors.white))
+                  ),
+                ),
+              ),
+            )
           ],
         ),
         body: _buildBody(),
