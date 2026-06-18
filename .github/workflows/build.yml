@@ -11,12 +11,22 @@ jobs:
           
       - run: flutter create --project-name protube_app . 
       
-      # 🌐 सिर्फ इंटरनेट परमिशन
+      # 🌐 इंटरनेट परमिशन
       - run: sed -i 's/<application/<uses-permission android:name="android.permission.INTERNET"\/>\n    <application/g' android/app/src/main/AndroidManifest.xml
       
       - run: flutter pub get
       
-      # 🥷 InAppWebView ProGuard फिक्स (यह सिर्फ youtube_player के लिए ज़रूरी है)
+      # 🛡️ हमारी अल्टीमेट ढाल: यह किसी भी पुराने पैकेज (API 31, 32, 33) को पकड़कर 34 पर कर देगी
+      - name: Patch API levels safely
+        run: |
+          find /home/runner/.pub-cache/hosted/pub.dev/ -type f -name "build.gradle*" -exec sed -i 's/compileSdkVersion 31/compileSdkVersion 34/g' {} +
+          find /home/runner/.pub-cache/hosted/pub.dev/ -type f -name "build.gradle*" -exec sed -i 's/compileSdk 31/compileSdk 34/g' {} +
+          find /home/runner/.pub-cache/hosted/pub.dev/ -type f -name "build.gradle*" -exec sed -i 's/compileSdkVersion 32/compileSdkVersion 34/g' {} +
+          find /home/runner/.pub-cache/hosted/pub.dev/ -type f -name "build.gradle*" -exec sed -i 's/compileSdk 32/compileSdk 34/g' {} +
+          find /home/runner/.pub-cache/hosted/pub.dev/ -type f -name "build.gradle*" -exec sed -i 's/compileSdkVersion 33/compileSdkVersion 34/g' {} +
+          find /home/runner/.pub-cache/hosted/pub.dev/ -type f -name "build.gradle*" -exec sed -i 's/compileSdk 33/compileSdk 34/g' {} +
+      
+      # 🥷 InAppWebView ProGuard फिक्स
       - name: Fix Proguard Error
         run: find /home/runner/.pub-cache/hosted/pub.dev/ -type f -name "build.gradle*" -path "*/flutter_inappwebview*/android/build.gradle*" -exec sed -i 's/proguard-android.txt/proguard-android-optimize.txt/g' {} +
       
