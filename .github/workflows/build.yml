@@ -14,20 +14,36 @@ jobs:
       # 🌐 निंजा तकनीक 1: इंटरनेट परमिशन
       - run: sed -i 's/<application/<uses-permission android:name="android.permission.INTERNET"\/>\n    <application/g' android/app/src/main/AndroidManifest.xml
 
-      # 📦 सबसे पहले पैकेजेस डाउनलोड करो ताकि कोई फाइल मिस न हो
       - run: flutter pub get
 
       # 🛡️ सेफ फिक्स 1: पुराने API 33 को 34 पर लाना
-      - name: Patch API levels
+      - name: Patch API levels safely
         run: |
           find /home/runner/.pub-cache/hosted/pub.dev/ -type f -name "build.gradle*" -exec sed -i 's/compileSdkVersion 33/compileSdkVersion 34/g' {} +
           find /home/runner/.pub-cache/hosted/pub.dev/ -type f -name "build.gradle*" -exec sed -i 's/compileSdk 33/compileSdk 34/g' {} +
       
-      # 🚀 नया ब्रह्मास्त्र: Java 1.8 और 11 के झगड़े का पक्का इलाज (Volume Controller फिक्स)
-      - name: Fix Kotlin JVM Target
+      # 🚀 सबसे सुरक्षित फिक्स: बिना फाइलें छेड़े Gradle को Java 11 का रूल देना
+      - name: Safe Gradle JVM Patch
         run: |
-          find /home/runner/.pub-cache/hosted/pub.dev/ -type f -name "build.gradle*" -exec sed -i "s/jvmTarget = '1.8'/jvmTarget = '11'/g" {} +
-          find /home/runner/.pub-cache/hosted/pub.dev/ -type f -name "build.gradle*" -exec sed -i 's/jvmTarget = "1.8"/jvmTarget = "11"/g' {} +
+          cat <<EOF >> android/build.gradle
+          subprojects {
+              afterEvaluate { project ->
+                  if (project.hasProperty("android")) {
+                      project.android {
+                          compileOptions {
+                              sourceCompatibility JavaVersion.VERSION_11
+                              targetCompatibility JavaVersion.VERSION_11
+                          }
+                      }
+                  }
+                  project.tasks.withType(org.jetbrains.kotlin.gradle.tasks.KotlinCompile).configureEach {
+                      kotlinOptions {
+                          jvmTarget = "11"
+                      }
+                  }
+              }
+          }
+          EOF
       
       # 🥷 ProGuard फिक्स
       - name: Fix Proguard Error
