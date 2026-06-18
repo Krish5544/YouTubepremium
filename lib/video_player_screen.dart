@@ -1,6 +1,6 @@
 import 'dart:convert';
 import 'package:flutter/material.dart';
-import 'package:http/http.dart' as http; // 🌟 असली वीडियोज़ मंगाने के लिए
+import 'package:http/http.dart' as http;
 import 'package:youtube_player_flutter/youtube_player_flutter.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:share_plus/share_plus.dart';
@@ -19,22 +19,22 @@ class _VideoPlayerScreenState extends State<VideoPlayerScreen> {
   bool _isPlayerReady = false;
   bool _isDescriptionExpanded = false;
   
-  // 🌟 असली वीडियोज़ के लिए वेरिएबल्स
   List<Map<String, dynamic>> _relatedVideos = [];
   bool _isLoadingRelated = true;
   final String apiKey = 'AIzaSyBpPAohs_WhlCTiozmCVMEzrGsRE86LgpU';
+  
+  // 🌟 अगली वीडियो को बार-बार प्ले होने से रोकने का गार्ड
+  bool _isNavigatingToNext = false; 
 
   @override
   void initState() {
     super.initState();
     _initPlayer();
-    _fetchRelatedVideos(); // वीडियोज़ मंगाने का फंक्शन कॉल
+    _fetchRelatedVideos();
   }
 
-  // 🌟 YouTube API से असली 'Up Next' वीडियोज़ मंगाना
   Future<void> _fetchRelatedVideos() async {
     try {
-      // वीडियो के टाइटल से मिलते-जुलते कीवर्ड्स निकालना
       String query = Uri.encodeComponent(widget.title.split(' ').take(3).join(' '));
       String url = 'https://www.googleapis.com/youtube/v3/search?part=snippet&maxResults=15&q=$query&type=video&key=$apiKey';
 
@@ -44,7 +44,6 @@ class _VideoPlayerScreenState extends State<VideoPlayerScreen> {
       
       List<Map<String, dynamic>> newResults = [];
       for (var item in items) {
-        // जो वीडियो चल रही है, उसे दोबारा लिस्ट में नहीं दिखाना
         if (item['id']['videoId'] != widget.videoId) {
           newResults.add({
             'id': item['id']['videoId'],
@@ -91,7 +90,7 @@ class _VideoPlayerScreenState extends State<VideoPlayerScreen> {
         mute: false,
         startAt: startPosition, 
       ),
-    )..addListener(_savePosition);
+    )..addListener(_videoListener); // 🌟 नया मास्टर लिस्नर लगा दिया 🌟
 
     if (mounted) {
       setState(() {
@@ -100,8 +99,10 @@ class _VideoPlayerScreenState extends State<VideoPlayerScreen> {
     }
   }
 
-  void _savePosition() async {
-    if (_controller.value.isReady) {
+  // 🌟 यह फंक्शन हिस्ट्री भी सेव करेगा और वीडियो खत्म होने पर अगली भी चलाएगा 🌟
+  void _videoListener() async {
+    // 1. पोजीशन सेव करने का काम
+    if (_controller.value.isReady && !_isNavigatingToNext) {
       final prefs = await SharedPreferences.getInstance();
       List<String> historyList = prefs.getStringList('video_history') ?? [];
       
@@ -122,13 +123,36 @@ class _VideoPlayerScreenState extends State<VideoPlayerScreen> {
       };
       
       historyList.insert(0, jsonEncode(newData));
-      await prefs.setStringList('video_history', historyList);
+      prefs.setStringList('video_history', historyList); // await हटा दिया ताकि फ़ास्ट काम करे
+    }
+
+    // 2. ऑटो-प्ले नेक्स्ट (Auto-play Next) का जादुई कोड
+    if (_controller.value.playerState == PlayerState.ended && !_isNavigatingToNext) {
+      _isNavigatingToNext = true; // लॉक लगा दिया ताकि बार-बार पेज न खुले
+      
+      if (_relatedVideos.isNotEmpty) {
+        // 1 सेकंड का छोटा सा पॉज़ ताकि यूज़र को पता चले वीडियो खत्म हो गई है
+        Future.delayed(const Duration(seconds: 1), () {
+          if (mounted) {
+            final nextVideo = _relatedVideos[0];
+            Navigator.pushReplacement(
+              context,
+              MaterialPageRoute(
+                builder: (context) => VideoPlayerScreen(
+                  videoId: nextVideo['id'],
+                  title: nextVideo['title'],
+                ),
+              ),
+            );
+          }
+        });
+      }
     }
   }
 
   @override
   void dispose() {
-    _controller.removeListener(_savePosition);
+    _controller.removeListener(_videoListener);
     _controller.dispose();
     super.dispose();
   }
@@ -183,10 +207,7 @@ class _VideoPlayerScreenState extends State<VideoPlayerScreen> {
             body: SafeArea(
               child: Column(
                 children: [
-                  // 1. वीडियो प्लेयर (सबसे ऊपर फिक्स)
                   player,
-                  
-                  // 2. नीचे की स्क्रॉल लिस्ट
                   Expanded(
                     child: ListView(
                       padding: const EdgeInsets.symmetric(horizontal: 12.0, vertical: 14.0),
@@ -283,7 +304,6 @@ class _VideoPlayerScreenState extends State<VideoPlayerScreen> {
                         const Text("Up next", style: TextStyle(color: Colors.white, fontSize: 15, fontWeight: FontWeight.bold)),
                         const SizedBox(height: 14),
                         
-                        // 🌟 असली वीडियोज़ का डिज़ाइन 🌟
                         if (_isLoadingRelated)
                           const Center(child: Padding(padding: EdgeInsets.all(20.0), child: CircularProgressIndicator(color: Colors.red)))
                         else if (_relatedVideos.isEmpty)
@@ -323,11 +343,9 @@ class _VideoPlayerScreenState extends State<VideoPlayerScreen> {
     );
   }
 
-  // 🌟 असली 'Up next' वीडियोज़ का कार्ड
   Widget _buildRealRelatedVideo(Map<String, dynamic> video) {
     return GestureDetector(
       onTap: () {
-        // वीडियो पर क्लिक करते ही नया प्लेयर खुल जाएगा
         Navigator.pushReplacement(
           context,
           MaterialPageRoute(
