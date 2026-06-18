@@ -16,7 +16,7 @@ jobs:
       
       - run: flutter pub get
       
-      # 🥷 InAppWebView ProGuard फिक्स
+      # 🥷 InAppWebView ProGuard फिक्स (यह सिर्फ youtube_player के लिए ज़रूरी है)
       - name: Fix Proguard Error
         run: find /home/runner/.pub-cache/hosted/pub.dev/ -type f -name "build.gradle*" -path "*/flutter_inappwebview*/android/build.gradle*" -exec sed -i 's/proguard-android.txt/proguard-android-optimize.txt/g' {} +
       
