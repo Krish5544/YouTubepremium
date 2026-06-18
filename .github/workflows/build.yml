@@ -16,15 +16,11 @@ jobs:
       
       - run: flutter pub get
       
-      # 🛡️ हमारी अल्टीमेट ढाल: यह किसी भी पुराने पैकेज (API 31, 32, 33) को पकड़कर 34 पर कर देगी
-      - name: Patch API levels safely
+      # 🚀 द मास्टर स्ट्रोक: किसी भी पुराने API (31,32,33,34) को सीधा 36 में बदल देगा!
+      - name: Force API 36 globally
         run: |
-          find /home/runner/.pub-cache/hosted/pub.dev/ -type f -name "build.gradle*" -exec sed -i 's/compileSdkVersion 31/compileSdkVersion 34/g' {} +
-          find /home/runner/.pub-cache/hosted/pub.dev/ -type f -name "build.gradle*" -exec sed -i 's/compileSdk 31/compileSdk 34/g' {} +
-          find /home/runner/.pub-cache/hosted/pub.dev/ -type f -name "build.gradle*" -exec sed -i 's/compileSdkVersion 32/compileSdkVersion 34/g' {} +
-          find /home/runner/.pub-cache/hosted/pub.dev/ -type f -name "build.gradle*" -exec sed -i 's/compileSdk 32/compileSdk 34/g' {} +
-          find /home/runner/.pub-cache/hosted/pub.dev/ -type f -name "build.gradle*" -exec sed -i 's/compileSdkVersion 33/compileSdkVersion 34/g' {} +
-          find /home/runner/.pub-cache/hosted/pub.dev/ -type f -name "build.gradle*" -exec sed -i 's/compileSdk 33/compileSdk 34/g' {} +
+          find /home/runner/.pub-cache/hosted/pub.dev/ -type f -name "build.gradle*" -exec sed -i 's/compileSdkVersion [0-9][0-9]/compileSdkVersion 36/g' {} +
+          find /home/runner/.pub-cache/hosted/pub.dev/ -type f -name "build.gradle*" -exec sed -i 's/compileSdk [0-9][0-9]/compileSdk 36/g' {} +
       
       # 🥷 InAppWebView ProGuard फिक्स
       - name: Fix Proguard Error
