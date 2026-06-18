@@ -2,7 +2,7 @@ import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:youtube_player_flutter/youtube_player_flutter.dart';
 import 'package:shared_preferences/shared_preferences.dart';
-import 'package:share_plus/share_plus.dart'; // 🌟 शेयर पैकेज इम्पोर्ट किया
+import 'package:share_plus/share_plus.dart'; // 🌟 शेयर पैकेज इम्पोर्ट 🌟
 
 class VideoPlayerScreen extends StatefulWidget {
   final String videoId;
@@ -89,7 +89,7 @@ class _VideoPlayerScreenState extends State<VideoPlayerScreen> {
     super.dispose();
   }
 
-  // 🌟 यह है शेयर करने वाला जादुई फंक्शन 🌟
+  // 🌟 शेयर करने का मास्टर फंक्शन 🌟
   void _shareVideo() {
     final String youtubeLink = 'https://youtu.be/${widget.videoId}';
     Share.share('इस शानदार वीडियो को ProTube पर देखें: ${widget.title}\n$youtubeLink');
@@ -105,7 +105,6 @@ class _VideoPlayerScreenState extends State<VideoPlayerScreen> {
       );
     }
 
-    // हमारा पुराना बैक-बटन गार्ड
     return WillPopScope(
       onWillPop: () async {
         if (_controller.value.isFullScreen) {
