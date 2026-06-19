@@ -1,5 +1,6 @@
 import 'dart:convert';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart'; // 🌟 Native Android से बात करने के लिए
 import 'package:http/http.dart' as http;
 import 'package:shared_preferences/shared_preferences.dart';
 import 'search_delegate.dart';
@@ -33,6 +34,9 @@ class _YouTubeHomeScreenState extends State<YouTubeHomeScreen> {
   bool _isLoadingMoreSubs = false;
   int _currentSubChannelOffset = 0; 
 
+  // 🌟 Native Android Voice Search Channel 🌟
+  final MethodChannel _platform = const MethodChannel('com.protube_app/voice');
+
   @override
   void initState() {
     super.initState();
@@ -42,23 +46,21 @@ class _YouTubeHomeScreenState extends State<YouTubeHomeScreen> {
     _loadSubscriptions(isRefresh: true); 
   }
 
-  // 🌟 डमी वॉयस सर्च फंक्शन (ऐप को क्रैश से बचाने के लिए) 🌟
-  void _startVoiceSearch() {
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: Row(
-          children: const [
-            Icon(Icons.mic_off, color: Colors.white),
-            SizedBox(width: 10),
-            Expanded(child: Text("Voice Search is getting updated for modern Android. Please type!", style: TextStyle(color: Colors.white))),
-          ],
-        ),
-        backgroundColor: Colors.redAccent,
-        behavior: SnackBarBehavior.floating,
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
-        duration: const Duration(seconds: 3),
-      )
-    );
+  // 🎤 एकदम असली Google Voice Search चालू करने का फंक्शन 🎤
+  void _startVoiceSearch() async {
+    try {
+      final String result = await _platform.invokeMethod('startVoiceSearch');
+      if (result.isNotEmpty) {
+        setState(() {
+          currentQuery = result; // जो बोला वो सर्च बार में आ गया
+        });
+        _loadResults(currentQuery, isRefresh: true);
+      }
+    } catch (e) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text("Voice search unavailable.", style: TextStyle(color: Colors.white)), backgroundColor: Colors.red),
+      );
+    }
   }
 
   Future<void> _loadResults(String query, {bool isRefresh = false}) async {
@@ -276,8 +278,8 @@ class _YouTubeHomeScreenState extends State<YouTubeHomeScreen> {
                 child: GestureDetector(
                   onTap: () => showSearch(context: context, delegate: VideoSearchDelegate((q) => _loadResults(q, isRefresh: true))),
                   child: Container(
-                    height: 38,
-                    padding: const EdgeInsets.only(left: 12, right: 4),
+                    height: 42, // थोड़ा सा बड़ा किया ताकि माइक शानदार लगे
+                    padding: const EdgeInsets.only(left: 12, right: 6),
                     decoration: BoxDecoration(
                       color: Colors.white10,
                       borderRadius: BorderRadius.circular(20),
@@ -289,16 +291,25 @@ class _YouTubeHomeScreenState extends State<YouTubeHomeScreen> {
                         const Text("Search", style: TextStyle(color: Colors.grey, fontSize: 15)),
                         const Spacer(), 
                         
-                        // 🎤 माइक बटन मौजूद है, बस क्रैश नहीं करेगा! 🎤
+                        // 🌟 असली Google वाला 4-Color प्रीमियम माइक 🌟
                         GestureDetector(
                           onTap: _startVoiceSearch,
                           child: Container(
-                            padding: const EdgeInsets.all(6),
-                            decoration: const BoxDecoration(
-                              color: Colors.white12,
+                            padding: const EdgeInsets.all(7),
+                            decoration: BoxDecoration(
+                              color: Colors.grey[800], // डार्क बैकग्राउंड ताकि रंग खिलकर आएं
                               shape: BoxShape.circle,
                             ),
-                            child: const Icon(Icons.mic, color: Colors.white, size: 16),
+                            child: ShaderMask(
+                              shaderCallback: (Rect bounds) {
+                                return const LinearGradient(
+                                  colors: [Colors.blue, Colors.redAccent, Colors.yellow, Colors.green],
+                                  begin: Alignment.topLeft,
+                                  end: Alignment.bottomRight,
+                                ).createShader(bounds);
+                              },
+                              child: const Icon(Icons.mic, color: Colors.white, size: 20),
+                            ),
                           ),
                         ),
                       ],
