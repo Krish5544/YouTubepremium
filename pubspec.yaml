@@ -18,9 +18,6 @@ dependencies:
   # 🌟 तुम्हारे कहे अनुसार एकदम लेटेस्ट और मॉडर्न पैकेजेस 🌟
   flutter_volume_controller: ^2.0.1
   screen_brightness: ^2.1.1
-  
-  # 🎤 माइक (Voice Search) के लिए नया पैकेज 🌟
-  speech_to_text: ^6.5.1
 
 dev_dependencies:
   flutter_test:
