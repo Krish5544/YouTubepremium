@@ -1,6 +1,6 @@
 import 'dart:convert';
 import 'package:flutter/material.dart';
-import 'package:flutter/services.dart'; // 🌟 Native Android se baat karne के liye
+import 'package:flutter/services.dart'; 
 import 'package:http/http.dart' as http;
 import 'package:shared_preferences/shared_preferences.dart';
 import 'search_delegate.dart';
@@ -16,7 +16,6 @@ class YouTubeHomeScreen extends StatefulWidget {
 }
 
 class _YouTubeHomeScreenState extends State<YouTubeHomeScreen> {
-  // 🌟 Side-bar kholne ke liye Scaffold Key 🌟
   final GlobalKey<ScaffoldState> _scaffoldKey = GlobalKey<ScaffoldState>();
   
   int _selectedIndex = 0;
@@ -35,14 +34,15 @@ class _YouTubeHomeScreenState extends State<YouTubeHomeScreen> {
   List<Map<String, dynamic>> _subscribedChannelsDetails = []; 
   bool _isLoadingSubscriptions = false;
   bool _isLoadingMoreSubs = false;
-  int _currentSubChannelOffset = 0; 
+  
+  // 🌟 अनलिमिटेड स्क्रॉलिंग का जादुई सिस्टम 🌟
+  Map<String, String> _subPageTokens = {}; 
+  bool _hasMoreSubs = true;
 
   final MethodChannel _platform = const MethodChannel('com.protube_app/voice');
 
-  // 🌟 Theme (Dark/Light Mode) ke variables 🌟
-  bool isDarkMode = true; // Default dark mode rahega
+  bool isDarkMode = true; 
 
-  // 🎨 Dynamic Colors (Jo mode ke hisab se badlenge) 🎨
   Color get bgColor => isDarkMode ? const Color(0xFF0F0F0F) : Colors.white;
   Color get textColor => isDarkMode ? Colors.white : Colors.black;
   Color get subTextColor => isDarkMode ? Colors.grey : Colors.grey[700]!;
@@ -52,14 +52,13 @@ class _YouTubeHomeScreenState extends State<YouTubeHomeScreen> {
   @override
   void initState() {
     super.initState();
-    _loadTheme(); // App khulte hi purani theme load karega
+    _loadTheme(); 
     _loadResults(currentQuery, isRefresh: true);
     _loadHistory(); 
     _loadWatchLater(); 
     _loadSubscriptions(isRefresh: true); 
   }
 
-  // 🌟 Theme save aur load karne ka logic 🌟
   Future<void> _loadTheme() async {
     final prefs = await SharedPreferences.getInstance();
     setState(() {
@@ -75,7 +74,6 @@ class _YouTubeHomeScreenState extends State<YouTubeHomeScreen> {
     });
   }
 
-  // 🎤 Voice Search Button Call
   void _startVoiceSearch() async {
     try {
       final String result = await _platform.invokeMethod('startVoiceSearch');
@@ -163,12 +161,13 @@ class _YouTubeHomeScreenState extends State<YouTubeHomeScreen> {
     setState(() => _watchLaterData = savedList.map((item) => jsonDecode(item) as Map<String, dynamic>).toList());
   }
 
+  // 🌟 अनलिमिटेड पेजिंग वाला सब्सक्रिप्शन लोडर 🌟
   Future<void> _loadSubscriptions({bool isRefresh = false}) async {
     if (isRefresh) {
-      _currentSubChannelOffset = 0;
-      if (mounted) setState(() { _isLoadingSubscriptions = true; _subscriptionsData.clear(); _subscribedChannelsDetails.clear(); });
+      _subPageTokens.clear(); // रिफ्रेश करने पर डायरी खाली कर दो
+      if (mounted) setState(() { _isLoadingSubscriptions = true; _subscriptionsData.clear(); _subscribedChannelsDetails.clear(); _hasMoreSubs = true; });
     } else {
-      if (_isLoadingMoreSubs) return;
+      if (_isLoadingMoreSubs || !_hasMoreSubs) return;
       if (mounted) setState(() => _isLoadingMoreSubs = true);
     }
     
@@ -176,14 +175,15 @@ class _YouTubeHomeScreenState extends State<YouTubeHomeScreen> {
     List<String> subChannels = prefs.getStringList('subscribed_channels') ?? [];
 
     if (subChannels.isEmpty) {
-      if (mounted) setState(() { _isLoadingSubscriptions = false; _isLoadingMoreSubs = false; });
+      if (mounted) setState(() { _isLoadingSubscriptions = false; _isLoadingMoreSubs = false; _hasMoreSubs = false; });
       return;
     }
 
     try {
+      var topChannels = subChannels.take(10).toList(); // टॉप 10 चैनल्स की हिस्ट्री लाएगा
+
       if (isRefresh) {
-        var top50Channels = subChannels.take(50).toList(); 
-        var channelRes = await http.get(Uri.parse('https://www.googleapis.com/youtube/v3/channels?part=snippet&id=${top50Channels.join(',')}&key=$apiKey'));
+        var channelRes = await http.get(Uri.parse('https://www.googleapis.com/youtube/v3/channels?part=snippet&id=${topChannels.join(',')}&key=$apiKey'));
         if (channelRes.statusCode == 200) {
           var chData = jsonDecode(channelRes.body)['items'] ?? [];
           for (var ch in chData) {
@@ -194,51 +194,61 @@ class _YouTubeHomeScreenState extends State<YouTubeHomeScreen> {
         }
       }
 
-      int limit = 5;
-      var batchChannels = subChannels.skip(_currentSubChannelOffset).take(limit).toList();
+      List<Map<String, dynamic>> newVideos = [];
+      bool anyChannelHasMore = false;
+      
+      for (String cId in topChannels) {
+        String? token = _subPageTokens[cId];
+        if (token == 'END') continue; // अगर इस चैनल की सारी वीडियोज़ खत्म हो गईं, तो इसे छोड़ दो
 
-      if (batchChannels.isNotEmpty) {
-        List<Map<String, dynamic>> newVideos = [];
-        
-        for (String cId in batchChannels) {
-          String url = 'https://www.googleapis.com/youtube/v3/search?part=snippet&channelId=$cId&maxResults=10&order=date&type=video&key=$apiKey';
-          var res = await http.get(Uri.parse(url));
-          if (res.statusCode == 200) {
-            var data = jsonDecode(res.body);
-            List items = data['items'] ?? [];
-            for (var item in items) {
-              newVideos.add({
-                'type': 'video', 'id': item['id']['videoId'], 'title': item['snippet']['title'],
-                'thumbnail': item['snippet']['thumbnails']['high']?['url'] ?? '', 'author': item['snippet']['channelTitle'],
-                'channelId': item['snippet']['channelId'], 'date': item['snippet']['publishedAt'],
-                'durationStr': '', 'views': '0', 'channelLogo': ''
-              });
-            }
-          }
+        String url = 'https://www.googleapis.com/youtube/v3/search?part=snippet&channelId=$cId&maxResults=10&order=date&type=video&key=$apiKey';
+        if (token != null && token.isNotEmpty) {
+          url += '&pageToken=$token'; // 🌟 अगली पेज की वीडियोज़ लाओ
         }
 
-        if (newVideos.isNotEmpty) {
-          List<String> videoIds = newVideos.map((v) => v['id'].toString()).toList();
-          for (int i = 0; i < videoIds.length; i += 50) {
-            var chunk = videoIds.skip(i).take(50).toList();
-            var detailsRes = await http.get(Uri.parse('https://www.googleapis.com/youtube/v3/videos?part=contentDetails,statistics&id=${chunk.join(',')}&key=$apiKey'));
-            if (detailsRes.statusCode == 200) {
-               var vDetails = jsonDecode(detailsRes.body)['items'] ?? [];
-               Map<String, dynamic> detailMap = { for (var v in vDetails) v['id']: v };
-               for(var v in newVideos) {
-                  var d = detailMap[v['id']];
-                  if (d != null) {
-                     v['durationStr'] = _formatDuration(_parseDuration(d['contentDetails']['duration']));
-                     v['views'] = d['statistics']['viewCount'] ?? '0';
-                  }
-               }
-            }
+        var res = await http.get(Uri.parse(url));
+        if (res.statusCode == 200) {
+          var data = jsonDecode(res.body);
+          String? nextToken = data['nextPageToken'];
+          _subPageTokens[cId] = nextToken ?? 'END'; // डायरी में अगला पेज सेव करो
+          if (nextToken != null) anyChannelHasMore = true;
+
+          List items = data['items'] ?? [];
+          for (var item in items) {
+            newVideos.add({
+              'type': 'video', 'id': item['id']['videoId'], 'title': item['snippet']['title'],
+              'thumbnail': item['snippet']['thumbnails']['high']?['url'] ?? '', 'author': item['snippet']['channelTitle'],
+              'channelId': item['snippet']['channelId'], 'date': item['snippet']['publishedAt'],
+              'durationStr': '', 'views': '0', 'channelLogo': ''
+            });
           }
         }
+      }
 
-        _subscriptionsData.addAll(newVideos);
-        _subscriptionsData.sort((a, b) => DateTime.parse(b['date']).compareTo(DateTime.parse(a['date'])));
-        _currentSubChannelOffset += limit;
+      if (newVideos.isNotEmpty) {
+        List<String> videoIds = newVideos.map((v) => v['id'].toString()).toList();
+        for (int i = 0; i < videoIds.length; i += 50) {
+          var chunk = videoIds.skip(i).take(50).toList();
+          var detailsRes = await http.get(Uri.parse('https://www.googleapis.com/youtube/v3/videos?part=contentDetails,statistics&id=${chunk.join(',')}&key=$apiKey'));
+          if (detailsRes.statusCode == 200) {
+             var vDetails = jsonDecode(detailsRes.body)['items'] ?? [];
+             Map<String, dynamic> detailMap = { for (var v in vDetails) v['id']: v };
+             for(var v in newVideos) {
+                var d = detailMap[v['id']];
+                if (d != null) {
+                   v['durationStr'] = _formatDuration(_parseDuration(d['contentDetails']['duration']));
+                   v['views'] = d['statistics']['viewCount'] ?? '0';
+                }
+             }
+          }
+        }
+      }
+
+      newVideos.sort((a, b) => DateTime.parse(b['date']).compareTo(DateTime.parse(a['date'])));
+      _subscriptionsData.addAll(newVideos); // नई वीडियोज़ को नीचे जोड़ दो
+      
+      if (!anyChannelHasMore) {
+         _hasMoreSubs = false; // अगर किसी भी चैनल के पास वीडियोज़ नहीं बचीं, तो अनलिमिटेड लोडिंग रोक दो
       }
 
       if (mounted) setState(() { _isLoadingSubscriptions = false; _isLoadingMoreSubs = false; });
@@ -288,7 +298,6 @@ class _YouTubeHomeScreenState extends State<YouTubeHomeScreen> {
         key: _scaffoldKey, 
         backgroundColor: bgColor, 
         
-        // 🌟 Premium Side-bar 🌟
         endDrawer: Drawer(
           backgroundColor: bgColor,
           child: Column(
@@ -386,7 +395,6 @@ class _YouTubeHomeScreenState extends State<YouTubeHomeScreen> {
                         const Text("Search", style: TextStyle(color: Colors.grey, fontSize: 15)),
                         const Spacer(), 
                         
-                        // 🌟 ISS BAAR YEH 100% VISIBLE CHAMKTA HUA MIC ICON HAI 🌟
                         GestureDetector(
                           onTap: _startVoiceSearch,
                           child: Container(
@@ -396,7 +404,7 @@ class _YouTubeHomeScreenState extends State<YouTubeHomeScreen> {
                               shape: BoxShape.circle,
                             ),
                             child: ShaderMask(
-                              blendMode: BlendMode.srcIn, // 🌟 ISS LINE SE MIC GAYAB NAHI HOGA, COLORFUL DIKHEGA 🌟
+                              blendMode: BlendMode.srcIn,
                               shaderCallback: (Rect bounds) {
                                 return const LinearGradient(
                                   colors: [Colors.blue, Colors.redAccent, Colors.yellow, Colors.green],
@@ -514,7 +522,8 @@ class _YouTubeHomeScreenState extends State<YouTubeHomeScreen> {
           Expanded(
             child: NotificationListener<ScrollNotification>(
               onNotification: (ScrollNotification scrollInfo) {
-                if (!_isLoadingMoreSubs && scrollInfo.metrics.pixels >= scrollInfo.metrics.maxScrollExtent - 800) {
+                // 🌟 जादुई बदलाव: अब स्क्रॉल करने पर यह रुकेगा नहीं! 🌟
+                if (!_isLoadingMoreSubs && _hasMoreSubs && scrollInfo.metrics.pixels >= scrollInfo.metrics.maxScrollExtent - 800) {
                   _loadSubscriptions(isRefresh: false); 
                 }
                 return true;
