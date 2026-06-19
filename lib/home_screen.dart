@@ -1,6 +1,6 @@
 import 'dart:convert';
 import 'package:flutter/material.dart';
-import 'package:flutter/services.dart'; // 🌟 Native Android से बात करने के लिए
+import 'package:flutter/services.dart'; 
 import 'package:http/http.dart' as http;
 import 'package:shared_preferences/shared_preferences.dart';
 import 'search_delegate.dart';
@@ -16,6 +16,9 @@ class YouTubeHomeScreen extends StatefulWidget {
 }
 
 class _YouTubeHomeScreenState extends State<YouTubeHomeScreen> {
+  // 🌟 साइड-बार खोलने के लिए Scaffold Key 🌟
+  final GlobalKey<ScaffoldState> _scaffoldKey = GlobalKey<ScaffoldState>();
+  
   int _selectedIndex = 0;
   final String apiKey = 'AIzaSyBpPAohs_WhlCTiozmCVMEzrGsRE86LgpU';
   
@@ -34,25 +37,50 @@ class _YouTubeHomeScreenState extends State<YouTubeHomeScreen> {
   bool _isLoadingMoreSubs = false;
   int _currentSubChannelOffset = 0; 
 
-  // 🌟 Native Android Voice Search Channel 🌟
   final MethodChannel _platform = const MethodChannel('com.protube_app/voice');
+
+  // 🌟 Theme (Dark/Light Mode) के वेरिएबल्स 🌟
+  bool isDarkMode = true; // डिफ़ॉल्ट डार्क मोड रहेगा
+
+  // 🎨 डायनामिक कलर्स (जो मोड के हिसाब से अपने आप बदलेंगे) 🎨
+  Color get bgColor => isDarkMode ? const Color(0xFF0F0F0F) : Colors.white;
+  Color get textColor => isDarkMode ? Colors.white : Colors.black;
+  Color get subTextColor => isDarkMode ? Colors.grey : Colors.grey[700]!;
+  Color get searchBgColor => isDarkMode ? Colors.white10 : Colors.grey[200]!;
+  Color get iconColor => isDarkMode ? Colors.white : Colors.black;
 
   @override
   void initState() {
     super.initState();
+    _loadTheme(); // ऐप खुलते ही पुरानी थीम लोड करेगा
     _loadResults(currentQuery, isRefresh: true);
     _loadHistory(); 
     _loadWatchLater(); 
     _loadSubscriptions(isRefresh: true); 
   }
 
-  // 🎤 एकदम असली Google Voice Search चालू करने का फंक्शन 🎤
+  // 🌟 थीम सेव और लोड करने का लॉजिक 🌟
+  Future<void> _loadTheme() async {
+    final prefs = await SharedPreferences.getInstance();
+    setState(() {
+      isDarkMode = prefs.getBool('isDarkMode') ?? true;
+    });
+  }
+
+  Future<void> _toggleTheme(bool value) async {
+    final prefs = await SharedPreferences.getInstance();
+    setState(() {
+      isDarkMode = value;
+      prefs.setBool('isDarkMode', value);
+    });
+  }
+
   void _startVoiceSearch() async {
     try {
       final String result = await _platform.invokeMethod('startVoiceSearch');
       if (result.isNotEmpty) {
         setState(() {
-          currentQuery = result; // जो बोला वो सर्च बार में आ गया
+          currentQuery = result; 
         });
         _loadResults(currentQuery, isRefresh: true);
       }
@@ -256,19 +284,89 @@ class _YouTubeHomeScreenState extends State<YouTubeHomeScreen> {
         return true;
       },
       child: Scaffold(
-        backgroundColor: const Color(0xFF0F0F0F),
+        key: _scaffoldKey, // 🌟 Scaffold Key (स्लाइडर खोलने के लिए)
+        backgroundColor: bgColor, // 🌟 डायनामिक बैकग्राउंड
+        
+        // 🌟 दाईं तरफ़ खुलने वाला प्रीमियम साइड-बार (Sidebar) 🌟
+        endDrawer: Drawer(
+          backgroundColor: bgColor,
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              // 🌟 "Made by Krishna Saini" वाला शानदार हेडर 🌟
+              Container(
+                width: double.infinity,
+                padding: const EdgeInsets.only(top: 60, bottom: 30, left: 20, right: 20),
+                decoration: BoxDecoration(
+                  gradient: LinearGradient(
+                    colors: isDarkMode ? [Colors.red[900]!, Colors.black] : [Colors.red[400]!, Colors.red[100]!],
+                    begin: Alignment.topLeft,
+                    end: Alignment.bottomRight,
+                  ),
+                ),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    const CircleAvatar(
+                      radius: 35,
+                      backgroundColor: Colors.white,
+                      child: Text("K", style: TextStyle(fontSize: 30, color: Colors.red, fontWeight: FontWeight.bold)),
+                    ),
+                    const SizedBox(height: 15),
+                    Text("ProTube", style: TextStyle(color: isDarkMode ? Colors.white : Colors.black87, fontSize: 24, fontWeight: FontWeight.bold)),
+                    const SizedBox(height: 5),
+                    Text("Made by Krishna Saini", style: TextStyle(color: isDarkMode ? Colors.white70 : Colors.black54, fontSize: 14, fontWeight: FontWeight.w600)),
+                  ],
+                ),
+              ),
+              const SizedBox(height: 10),
+              
+              // 🌟 Dark Mode / Light Mode स्विच 🌟
+              ListTile(
+                leading: Icon(isDarkMode ? Icons.dark_mode : Icons.light_mode, color: iconColor),
+                title: Text("Dark Theme", style: TextStyle(color: textColor, fontSize: 16, fontWeight: FontWeight.w500)),
+                trailing: Switch(
+                  value: isDarkMode,
+                  onChanged: _toggleTheme,
+                  activeColor: Colors.red,
+                ),
+              ),
+              
+              const Divider(color: Colors.grey, height: 1, thickness: 0.2),
+
+              // 🌟 Settings टैब 🌟
+              ListTile(
+                leading: Icon(Icons.settings_outlined, color: iconColor),
+                title: Text("Settings", style: TextStyle(color: textColor, fontSize: 16, fontWeight: FontWeight.w500)),
+                onTap: () {
+                  // बाद में जब हम सेटिंग्स पेज बनाएंगे, तो यहाँ ऐड करेंगे
+                  Navigator.pop(context); // क्लिक करते ही साइड-बार बंद हो जाएगा
+                },
+              ),
+              
+              const Spacer(),
+              Center(
+                child: Padding(
+                  padding: const EdgeInsets.only(bottom: 20.0),
+                  child: Text("Version 1.0.0", style: TextStyle(color: subTextColor, fontSize: 12)),
+                ),
+              )
+            ],
+          ),
+        ),
+
         appBar: AppBar(
-          backgroundColor: const Color(0xFF0F0F0F),
+          backgroundColor: bgColor,
           elevation: 0,
           titleSpacing: 12.0,
           title: Row(
             children: [
               RichText(
-                text: const TextSpan(
-                  style: TextStyle(fontSize: 22, fontWeight: FontWeight.bold, letterSpacing: -0.5),
+                text: TextSpan(
+                  style: const TextStyle(fontSize: 22, fontWeight: FontWeight.bold, letterSpacing: -0.5),
                   children: [
-                    TextSpan(text: 'Pro', style: TextStyle(color: Colors.white)),
-                    TextSpan(text: 'Tube', style: TextStyle(color: Colors.red)),
+                    TextSpan(text: 'Pro', style: TextStyle(color: textColor)), // Pro का रंग थीम के हिसाब से बदलेगा
+                    const TextSpan(text: 'Tube', style: TextStyle(color: Colors.red)),
                   ],
                 ),
               ),
@@ -278,10 +376,10 @@ class _YouTubeHomeScreenState extends State<YouTubeHomeScreen> {
                 child: GestureDetector(
                   onTap: () => showSearch(context: context, delegate: VideoSearchDelegate((q) => _loadResults(q, isRefresh: true))),
                   child: Container(
-                    height: 42, // थोड़ा सा बड़ा किया ताकि माइक शानदार लगे
+                    height: 42,
                     padding: const EdgeInsets.only(left: 12, right: 6),
                     decoration: BoxDecoration(
-                      color: Colors.white10,
+                      color: searchBgColor, // 🌟 डायनामिक सर्च बार कलर
                       borderRadius: BorderRadius.circular(20),
                     ),
                     child: Row(
@@ -291,13 +389,12 @@ class _YouTubeHomeScreenState extends State<YouTubeHomeScreen> {
                         const Text("Search", style: TextStyle(color: Colors.grey, fontSize: 15)),
                         const Spacer(), 
                         
-                        // 🌟 असली Google वाला 4-Color प्रीमियम माइक 🌟
                         GestureDetector(
                           onTap: _startVoiceSearch,
                           child: Container(
                             padding: const EdgeInsets.all(7),
                             decoration: BoxDecoration(
-                              color: Colors.grey[800], // डार्क बैकग्राउंड ताकि रंग खिलकर आएं
+                              color: isDarkMode ? Colors.grey[800] : Colors.grey[300], // 🌟 माइक का बैकग्राउंड
                               shape: BoxShape.circle,
                             ),
                             child: ShaderMask(
@@ -324,7 +421,10 @@ class _YouTubeHomeScreenState extends State<YouTubeHomeScreen> {
               padding: const EdgeInsets.only(right: 12.0, left: 8.0),
               child: Center(
                 child: GestureDetector(
-                  onTap: () {},
+                  // 🌟 प्रोफाइल पर क्लिक करते ही साइड-बार खुलेगा 🌟
+                  onTap: () {
+                    _scaffoldKey.currentState?.openEndDrawer(); 
+                  },
                   child: const CircleAvatar(
                     radius: 14, 
                     backgroundColor: Colors.deepPurple, 
@@ -337,7 +437,11 @@ class _YouTubeHomeScreenState extends State<YouTubeHomeScreen> {
         ),
         body: _buildBody(),
         bottomNavigationBar: BottomNavigationBar(
-          backgroundColor: const Color(0xFF0F0F0F), selectedItemColor: Colors.white, unselectedItemColor: Colors.grey, currentIndex: _selectedIndex, type: BottomNavigationBarType.fixed, 
+          backgroundColor: bgColor, 
+          selectedItemColor: isDarkMode ? Colors.white : Colors.black, // 🌟 डायनामिक
+          unselectedItemColor: Colors.grey, 
+          currentIndex: _selectedIndex, 
+          type: BottomNavigationBarType.fixed, 
           onTap: (i) { 
             setState(() => _selectedIndex = i); 
             if (i == 1 && _subscriptionsData.isEmpty) _loadSubscriptions(isRefresh: true); 
@@ -371,8 +475,8 @@ class _YouTubeHomeScreenState extends State<YouTubeHomeScreen> {
           itemBuilder: (context, index) {
             if (index == searchResults.length) return const Padding(padding: EdgeInsets.all(20.0), child: Center(child: CircularProgressIndicator(color: Colors.red)));
             final item = searchResults[index];
-            if (item['type'] == 'channel') return ListTile(contentPadding: const EdgeInsets.all(16), leading: CircleAvatar(radius: 30, backgroundImage: NetworkImage(item['thumbnail'])), title: Text(item['title'], style: const TextStyle(color: Colors.white, fontSize: 18, fontWeight: FontWeight.bold)), subtitle: const Text("SUBSCRIBE", style: TextStyle(color: Colors.red)), onTap: () => Navigator.push(context, MaterialPageRoute(builder: (c) => ChannelScreen(channelId: item['id']))));
-            if (item['type'] == 'playlist') return ListTile(contentPadding: const EdgeInsets.all(8), leading: Stack(alignment: Alignment.centerRight, children: [Image.network(item['thumbnail'], width: 120, height: 80, fit: BoxFit.cover), Container(width: 40, height: 80, color: Colors.black.withOpacity(0.7), child: const Center(child: Icon(Icons.playlist_play, color: Colors.white)))]), title: Text(item['title'], style: const TextStyle(color: Colors.white, fontSize: 16)), subtitle: Text("Playlist • ${item['channel']}", style: const TextStyle(color: Colors.grey)), onTap: () => Navigator.push(context, MaterialPageRoute(builder: (c) => PlaylistScreen(playlistId: item['id'], playlistTitle: item['title']))));
+            if (item['type'] == 'channel') return ListTile(contentPadding: const EdgeInsets.all(16), leading: CircleAvatar(radius: 30, backgroundImage: NetworkImage(item['thumbnail'])), title: Text(item['title'], style: TextStyle(color: textColor, fontSize: 18, fontWeight: FontWeight.bold)), subtitle: const Text("SUBSCRIBE", style: TextStyle(color: Colors.red)), onTap: () => Navigator.push(context, MaterialPageRoute(builder: (c) => ChannelScreen(channelId: item['id']))));
+            if (item['type'] == 'playlist') return ListTile(contentPadding: const EdgeInsets.all(8), leading: Stack(alignment: Alignment.centerRight, children: [Image.network(item['thumbnail'], width: 120, height: 80, fit: BoxFit.cover), Container(width: 40, height: 80, color: Colors.black.withOpacity(0.7), child: const Center(child: Icon(Icons.playlist_play, color: Colors.white)))]), title: Text(item['title'], style: TextStyle(color: textColor, fontSize: 16)), subtitle: Text("Playlist • ${item['channel']}", style: TextStyle(color: subTextColor)), onTap: () => Navigator.push(context, MaterialPageRoute(builder: (c) => PlaylistScreen(playlistId: item['id'], playlistTitle: item['title']))));
             return _buildVideoCard(item['id'], item['title'], item['thumbnail'], "${item['author']} • ${_formatViews(item['views'])} views • ${_formatExactDate(item['date'])}", item['durationStr'], false, item['channelId'], item['channelLogo']);
           },
         ),
@@ -380,14 +484,14 @@ class _YouTubeHomeScreenState extends State<YouTubeHomeScreen> {
     } 
     else if (_selectedIndex == 1) {
       if (_isLoadingSubscriptions) return const Center(child: CircularProgressIndicator(color: Colors.red));
-      if (_subscriptionsData.isEmpty && _subscribedChannelsDetails.isEmpty) return const Center(child: Column(mainAxisAlignment: MainAxisAlignment.center, children: [Icon(Icons.subscriptions_outlined, size: 60, color: Colors.grey), SizedBox(height: 10), Text("No subscriptions yet", style: TextStyle(color: Colors.grey, fontSize: 16))]));
+      if (_subscriptionsData.isEmpty && _subscribedChannelsDetails.isEmpty) return Center(child: Column(mainAxisAlignment: MainAxisAlignment.center, children: [Icon(Icons.subscriptions_outlined, size: 60, color: subTextColor), const SizedBox(height: 10), Text("No subscriptions yet", style: TextStyle(color: subTextColor, fontSize: 16))]));
       
       return Column(
         children: [
           if (_subscribedChannelsDetails.isNotEmpty)
             Container(
               height: 100, padding: const EdgeInsets.symmetric(vertical: 10),
-              decoration: const BoxDecoration(border: Border(bottom: BorderSide(color: Colors.white12, width: 1))),
+              decoration: BoxDecoration(border: Border(bottom: BorderSide(color: isDarkMode ? Colors.white12 : Colors.black12, width: 1))),
               child: ListView.builder(
                 scrollDirection: Axis.horizontal,
                 itemCount: _subscribedChannelsDetails.length,
@@ -399,9 +503,9 @@ class _YouTubeHomeScreenState extends State<YouTubeHomeScreen> {
                       width: 72, margin: const EdgeInsets.symmetric(horizontal: 6),
                       child: Column(
                         children: [
-                          CircleAvatar(radius: 28, backgroundImage: NetworkImage(ch['thumbnail']), backgroundColor: Colors.grey[800]),
+                          CircleAvatar(radius: 28, backgroundImage: NetworkImage(ch['thumbnail']), backgroundColor: isDarkMode ? Colors.grey[800] : Colors.grey[300]),
                           const SizedBox(height: 6),
-                          Text(ch['title'], style: const TextStyle(color: Colors.white, fontSize: 10), maxLines: 1, overflow: TextOverflow.ellipsis, textAlign: TextAlign.center)
+                          Text(ch['title'], style: TextStyle(color: textColor, fontSize: 10), maxLines: 1, overflow: TextOverflow.ellipsis, textAlign: TextAlign.center)
                         ],
                       ),
                     ),
@@ -431,11 +535,11 @@ class _YouTubeHomeScreenState extends State<YouTubeHomeScreen> {
       );
     } 
     else if (_selectedIndex == 2) {
-      if (_historyData.isEmpty) return const Center(child: Column(mainAxisAlignment: MainAxisAlignment.center, children: [Icon(Icons.history, size: 60, color: Colors.grey), SizedBox(height: 10), Text("History is empty", style: TextStyle(color: Colors.grey, fontSize: 16))]));
+      if (_historyData.isEmpty) return Center(child: Column(mainAxisAlignment: MainAxisAlignment.center, children: [Icon(Icons.history, size: 60, color: subTextColor), const SizedBox(height: 10), Text("History is empty", style: TextStyle(color: subTextColor, fontSize: 16))]));
       return ListView.builder(itemCount: _historyData.length, itemBuilder: (context, index) { final data = _historyData[index]; return _buildVideoCard(data['id'], data['title'], 'https://img.youtube.com/vi/${data['id']}/hqdefault.jpg', "History", _formatDuration(data['position'] ?? 0), true, data['channelId'] ?? '', data['channelLogo'] ?? ''); });
     } 
     else if (_selectedIndex == 3) {
-      if (_watchLaterData.isEmpty) return const Center(child: Column(mainAxisAlignment: MainAxisAlignment.center, children: [Icon(Icons.watch_later_outlined, size: 60, color: Colors.grey), SizedBox(height: 10), Text("No videos in Watch Later", style: TextStyle(color: Colors.grey, fontSize: 16))]));
+      if (_watchLaterData.isEmpty) return Center(child: Column(mainAxisAlignment: MainAxisAlignment.center, children: [Icon(Icons.watch_later_outlined, size: 60, color: subTextColor), const SizedBox(height: 10), Text("No videos in Watch Later", style: TextStyle(color: subTextColor, fontSize: 16))]));
       return ListView.builder(itemCount: _watchLaterData.length, itemBuilder: (context, index) { final data = _watchLaterData[index]; return _buildVideoCard(data['id'], data['title'], 'https://img.youtube.com/vi/${data['id']}/hqdefault.jpg', "Saved in Watch Later", "", false, "", ""); });
     }
     return Container();
@@ -455,7 +559,7 @@ class _YouTubeHomeScreenState extends State<YouTubeHomeScreen> {
             Stack(
               alignment: Alignment.bottomRight, 
               children: [
-                Image.network(imageUrl, height: 220, width: double.infinity, fit: BoxFit.cover, errorBuilder: (c, e, s) => Container(height: 220, color: Colors.grey[900])), 
+                Image.network(imageUrl, height: 220, width: double.infinity, fit: BoxFit.cover, errorBuilder: (c, e, s) => Container(height: 220, color: isDarkMode ? Colors.grey[900] : Colors.grey[300])), 
                 if (durationText.isNotEmpty) 
                   Container(margin: const EdgeInsets.all(8), padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 2), color: Colors.black.withOpacity(0.8), child: Text(durationText, style: const TextStyle(color: Colors.white, fontSize: 12)))
               ]
@@ -466,16 +570,16 @@ class _YouTubeHomeScreenState extends State<YouTubeHomeScreen> {
                 children: [
                   GestureDetector(
                     onTap: () { if (channelId.isNotEmpty) Navigator.push(context, MaterialPageRoute(builder: (c) => ChannelScreen(channelId: channelId))); }, 
-                    child: CircleAvatar(backgroundColor: Colors.grey[800], backgroundImage: channelLogoUrl.isNotEmpty ? NetworkImage(channelLogoUrl) : null, child: channelLogoUrl.isEmpty ? const Icon(Icons.person, color: Colors.white) : null)
+                    child: CircleAvatar(backgroundColor: isDarkMode ? Colors.grey[800] : Colors.grey[300], backgroundImage: channelLogoUrl.isNotEmpty ? NetworkImage(channelLogoUrl) : null, child: channelLogoUrl.isEmpty ? const Icon(Icons.person, color: Colors.white) : null)
                   ), 
                   const SizedBox(width: 12), 
                   Expanded(
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start, 
                       children: [
-                        Text(title, style: const TextStyle(color: Colors.white, fontSize: 15), maxLines: 2, overflow: TextOverflow.ellipsis), 
+                        Text(title, style: TextStyle(color: textColor, fontSize: 15), maxLines: 2, overflow: TextOverflow.ellipsis), 
                         const SizedBox(height: 4), 
-                        Text(isHistory ? "आपने $durationText तक देखा" : subtitleText, style: const TextStyle(color: Colors.grey, fontSize: 12))
+                        Text(isHistory ? "आपने $durationText तक देखा" : subtitleText, style: TextStyle(color: subTextColor, fontSize: 12))
                       ]
                     )
                   )
