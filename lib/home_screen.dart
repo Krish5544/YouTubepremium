@@ -27,7 +27,6 @@ class _YouTubeHomeScreenState extends State<YouTubeHomeScreen> {
   List<Map<String, dynamic>> _historyData = [];
   List<Map<String, dynamic>> _watchLaterData = [];
   
-  // 🌟 Subscriptions के एडवांस वेरिएबल्स 🌟
   List<Map<String, dynamic>> _subscriptionsData = [];
   List<Map<String, dynamic>> _subscribedChannelsDetails = []; 
   bool _isLoadingSubscriptions = false;
@@ -43,7 +42,25 @@ class _YouTubeHomeScreenState extends State<YouTubeHomeScreen> {
     _loadSubscriptions(isRefresh: true); 
   }
 
-  // 🌟 फ्लोलेस (Pre-fetch) सर्च रिजल्ट लोडिंग 🌟
+  // 🌟 डमी वॉयस सर्च फंक्शन (ऐप को क्रैश से बचाने के लिए) 🌟
+  void _startVoiceSearch() {
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Row(
+          children: const [
+            Icon(Icons.mic_off, color: Colors.white),
+            SizedBox(width: 10),
+            Expanded(child: Text("Voice Search is getting updated for modern Android. Please type!", style: TextStyle(color: Colors.white))),
+          ],
+        ),
+        backgroundColor: Colors.redAccent,
+        behavior: SnackBarBehavior.floating,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+        duration: const Duration(seconds: 3),
+      )
+    );
+  }
+
   Future<void> _loadResults(String query, {bool isRefresh = false}) async {
     if (isRefresh) {
       setState(() { isLoading = true; searchResults.clear(); nextPageToken = null; currentQuery = query; });
@@ -115,7 +132,6 @@ class _YouTubeHomeScreenState extends State<YouTubeHomeScreen> {
     setState(() => _watchLaterData = savedList.map((item) => jsonDecode(item) as Map<String, dynamic>).toList());
   }
 
-  // 🌟 सब्सक्रिप्शन का अल्टीमेट इनफिनिट लोडर (बिना अटके) 🌟
   Future<void> _loadSubscriptions({bool isRefresh = false}) async {
     if (isRefresh) {
       _currentSubChannelOffset = 0;
@@ -245,7 +261,6 @@ class _YouTubeHomeScreenState extends State<YouTubeHomeScreen> {
           titleSpacing: 12.0,
           title: Row(
             children: [
-              // 🌟 प्रीमियम ProTube लोगो 🌟
               RichText(
                 text: const TextSpan(
                   style: TextStyle(fontSize: 22, fontWeight: FontWeight.bold, letterSpacing: -0.5),
@@ -257,22 +272,35 @@ class _YouTubeHomeScreenState extends State<YouTubeHomeScreen> {
               ),
               const SizedBox(width: 16),
               
-              // 🌟 गूगल स्टाइल स्लीक सर्च बार 🌟
               Expanded(
                 child: GestureDetector(
                   onTap: () => showSearch(context: context, delegate: VideoSearchDelegate((q) => _loadResults(q, isRefresh: true))),
                   child: Container(
                     height: 38,
-                    padding: const EdgeInsets.symmetric(horizontal: 12),
+                    padding: const EdgeInsets.only(left: 12, right: 4),
                     decoration: BoxDecoration(
                       color: Colors.white10,
                       borderRadius: BorderRadius.circular(20),
                     ),
                     child: Row(
-                      children: const [
-                        Icon(Icons.search, color: Colors.grey, size: 18),
-                        SizedBox(width: 8),
-                        Text("Search", style: TextStyle(color: Colors.grey, fontSize: 15)),
+                      children: [
+                        const Icon(Icons.search, color: Colors.grey, size: 18),
+                        const SizedBox(width: 8),
+                        const Text("Search", style: TextStyle(color: Colors.grey, fontSize: 15)),
+                        const Spacer(), 
+                        
+                        // 🎤 माइक बटन मौजूद है, बस क्रैश नहीं करेगा! 🎤
+                        GestureDetector(
+                          onTap: _startVoiceSearch,
+                          child: Container(
+                            padding: const EdgeInsets.all(6),
+                            decoration: const BoxDecoration(
+                              color: Colors.white12,
+                              shape: BoxShape.circle,
+                            ),
+                            child: const Icon(Icons.mic, color: Colors.white, size: 16),
+                          ),
+                        ),
                       ],
                     ),
                   ),
@@ -285,9 +313,7 @@ class _YouTubeHomeScreenState extends State<YouTubeHomeScreen> {
               padding: const EdgeInsets.only(right: 12.0, left: 8.0),
               child: Center(
                 child: GestureDetector(
-                  onTap: () {
-                    // यहाँ बाद में प्रोफाइल/सेटिंग्स मेन्यू खुलेगा
-                  },
+                  onTap: () {},
                   child: const CircleAvatar(
                     radius: 14, 
                     backgroundColor: Colors.deepPurple, 
@@ -319,13 +345,11 @@ class _YouTubeHomeScreenState extends State<YouTubeHomeScreen> {
   }
 
   Widget _buildBody() {
-    // 🏠 टैब 0: Home Screen
     if (_selectedIndex == 0) {
       if (isLoading) return const Center(child: CircularProgressIndicator(color: Colors.red));
       
       return NotificationListener<ScrollNotification>(
         onNotification: (ScrollNotification scrollInfo) {
-          // 🌟 800 पिक्सल वाली स्मार्ट प्री-लोडिंग (यहाँ से जादू शुरू) 🌟
           if (!isLoadingMore && scrollInfo.metrics.pixels >= scrollInfo.metrics.maxScrollExtent - 800) {
             _loadResults(currentQuery); 
           }
@@ -343,15 +367,12 @@ class _YouTubeHomeScreenState extends State<YouTubeHomeScreen> {
         ),
       );
     } 
-    
-    // 📺 टैब 1: Subscriptions
     else if (_selectedIndex == 1) {
       if (_isLoadingSubscriptions) return const Center(child: CircularProgressIndicator(color: Colors.red));
       if (_subscriptionsData.isEmpty && _subscribedChannelsDetails.isEmpty) return const Center(child: Column(mainAxisAlignment: MainAxisAlignment.center, children: [Icon(Icons.subscriptions_outlined, size: 60, color: Colors.grey), SizedBox(height: 10), Text("No subscriptions yet", style: TextStyle(color: Colors.grey, fontSize: 16))]));
       
       return Column(
         children: [
-          // 🌟 ऊपर की गोल पट्टी (Horizontal Channel List) 🌟
           if (_subscribedChannelsDetails.isNotEmpty)
             Container(
               height: 100, padding: const EdgeInsets.symmetric(vertical: 10),
@@ -377,8 +398,6 @@ class _YouTubeHomeScreenState extends State<YouTubeHomeScreen> {
                 },
               ),
             ),
-            
-          // 🌟 नीचे की वीडियोज़ (इनफिनिट स्क्रॉल के साथ) 🌟
           Expanded(
             child: NotificationListener<ScrollNotification>(
               onNotification: (ScrollNotification scrollInfo) {
@@ -400,14 +419,10 @@ class _YouTubeHomeScreenState extends State<YouTubeHomeScreen> {
         ],
       );
     } 
-    
-    // 🕒 टैब 2: History
     else if (_selectedIndex == 2) {
       if (_historyData.isEmpty) return const Center(child: Column(mainAxisAlignment: MainAxisAlignment.center, children: [Icon(Icons.history, size: 60, color: Colors.grey), SizedBox(height: 10), Text("History is empty", style: TextStyle(color: Colors.grey, fontSize: 16))]));
       return ListView.builder(itemCount: _historyData.length, itemBuilder: (context, index) { final data = _historyData[index]; return _buildVideoCard(data['id'], data['title'], 'https://img.youtube.com/vi/${data['id']}/hqdefault.jpg', "History", _formatDuration(data['position'] ?? 0), true, data['channelId'] ?? '', data['channelLogo'] ?? ''); });
     } 
-    
-    // ⌚ टैब 3: Watch Later 
     else if (_selectedIndex == 3) {
       if (_watchLaterData.isEmpty) return const Center(child: Column(mainAxisAlignment: MainAxisAlignment.center, children: [Icon(Icons.watch_later_outlined, size: 60, color: Colors.grey), SizedBox(height: 10), Text("No videos in Watch Later", style: TextStyle(color: Colors.grey, fontSize: 16))]));
       return ListView.builder(itemCount: _watchLaterData.length, itemBuilder: (context, index) { final data = _watchLaterData[index]; return _buildVideoCard(data['id'], data['title'], 'https://img.youtube.com/vi/${data['id']}/hqdefault.jpg', "Saved in Watch Later", "", false, "", ""); });
