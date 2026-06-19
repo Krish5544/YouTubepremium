@@ -1,6 +1,6 @@
 import 'dart:convert';
 import 'package:flutter/material.dart';
-import 'package:flutter/services.dart'; 
+import 'package:flutter/services.dart'; // 🌟 Native Android se baat karne के liye
 import 'package:http/http.dart' as http;
 import 'package:shared_preferences/shared_preferences.dart';
 import 'search_delegate.dart';
@@ -16,7 +16,7 @@ class YouTubeHomeScreen extends StatefulWidget {
 }
 
 class _YouTubeHomeScreenState extends State<YouTubeHomeScreen> {
-  // 🌟 साइड-बार खोलने के लिए Scaffold Key 🌟
+  // 🌟 Side-bar kholne ke liye Scaffold Key 🌟
   final GlobalKey<ScaffoldState> _scaffoldKey = GlobalKey<ScaffoldState>();
   
   int _selectedIndex = 0;
@@ -39,10 +39,10 @@ class _YouTubeHomeScreenState extends State<YouTubeHomeScreen> {
 
   final MethodChannel _platform = const MethodChannel('com.protube_app/voice');
 
-  // 🌟 Theme (Dark/Light Mode) के वेरिएबल्स 🌟
-  bool isDarkMode = true; // डिफ़ॉल्ट डार्क मोड रहेगा
+  // 🌟 Theme (Dark/Light Mode) ke variables 🌟
+  bool isDarkMode = true; // Default dark mode rahega
 
-  // 🎨 डायनामिक कलर्स (जो मोड के हिसाब से अपने आप बदलेंगे) 🎨
+  // 🎨 Dynamic Colors (Jo mode ke hisab se badlenge) 🎨
   Color get bgColor => isDarkMode ? const Color(0xFF0F0F0F) : Colors.white;
   Color get textColor => isDarkMode ? Colors.white : Colors.black;
   Color get subTextColor => isDarkMode ? Colors.grey : Colors.grey[700]!;
@@ -52,14 +52,14 @@ class _YouTubeHomeScreenState extends State<YouTubeHomeScreen> {
   @override
   void initState() {
     super.initState();
-    _loadTheme(); // ऐप खुलते ही पुरानी थीम लोड करेगा
+    _loadTheme(); // App khulte hi purani theme load karega
     _loadResults(currentQuery, isRefresh: true);
     _loadHistory(); 
     _loadWatchLater(); 
     _loadSubscriptions(isRefresh: true); 
   }
 
-  // 🌟 थीम सेव और लोड करने का लॉजिक 🌟
+  // 🌟 Theme save aur load karne ka logic 🌟
   Future<void> _loadTheme() async {
     final prefs = await SharedPreferences.getInstance();
     setState(() {
@@ -75,6 +75,7 @@ class _YouTubeHomeScreenState extends State<YouTubeHomeScreen> {
     });
   }
 
+  // 🎤 Voice Search Button Call
   void _startVoiceSearch() async {
     try {
       final String result = await _platform.invokeMethod('startVoiceSearch');
@@ -284,16 +285,15 @@ class _YouTubeHomeScreenState extends State<YouTubeHomeScreen> {
         return true;
       },
       child: Scaffold(
-        key: _scaffoldKey, // 🌟 Scaffold Key (स्लाइडर खोलने के लिए)
-        backgroundColor: bgColor, // 🌟 डायनामिक बैकग्राउंड
+        key: _scaffoldKey, 
+        backgroundColor: bgColor, 
         
-        // 🌟 दाईं तरफ़ खुलने वाला प्रीमियम साइड-बार (Sidebar) 🌟
+        // 🌟 Premium Side-bar 🌟
         endDrawer: Drawer(
           backgroundColor: bgColor,
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              // 🌟 "Made by Krishna Saini" वाला शानदार हेडर 🌟
               Container(
                 width: double.infinity,
                 padding: const EdgeInsets.only(top: 60, bottom: 30, left: 20, right: 20),
@@ -321,7 +321,6 @@ class _YouTubeHomeScreenState extends State<YouTubeHomeScreen> {
               ),
               const SizedBox(height: 10),
               
-              // 🌟 Dark Mode / Light Mode स्विच 🌟
               ListTile(
                 leading: Icon(isDarkMode ? Icons.dark_mode : Icons.light_mode, color: iconColor),
                 title: Text("Dark Theme", style: TextStyle(color: textColor, fontSize: 16, fontWeight: FontWeight.w500)),
@@ -334,13 +333,11 @@ class _YouTubeHomeScreenState extends State<YouTubeHomeScreen> {
               
               const Divider(color: Colors.grey, height: 1, thickness: 0.2),
 
-              // 🌟 Settings टैब 🌟
               ListTile(
                 leading: Icon(Icons.settings_outlined, color: iconColor),
                 title: Text("Settings", style: TextStyle(color: textColor, fontSize: 16, fontWeight: FontWeight.w500)),
                 onTap: () {
-                  // बाद में जब हम सेटिंग्स पेज बनाएंगे, तो यहाँ ऐड करेंगे
-                  Navigator.pop(context); // क्लिक करते ही साइड-बार बंद हो जाएगा
+                  Navigator.pop(context); 
                 },
               ),
               
@@ -365,7 +362,7 @@ class _YouTubeHomeScreenState extends State<YouTubeHomeScreen> {
                 text: TextSpan(
                   style: const TextStyle(fontSize: 22, fontWeight: FontWeight.bold, letterSpacing: -0.5),
                   children: [
-                    TextSpan(text: 'Pro', style: TextStyle(color: textColor)), // Pro का रंग थीम के हिसाब से बदलेगा
+                    TextSpan(text: 'Pro', style: TextStyle(color: textColor)), 
                     const TextSpan(text: 'Tube', style: TextStyle(color: Colors.red)),
                   ],
                 ),
@@ -376,10 +373,10 @@ class _YouTubeHomeScreenState extends State<YouTubeHomeScreen> {
                 child: GestureDetector(
                   onTap: () => showSearch(context: context, delegate: VideoSearchDelegate((q) => _loadResults(q, isRefresh: true))),
                   child: Container(
-                    height: 42,
+                    height: 42, 
                     padding: const EdgeInsets.only(left: 12, right: 6),
                     decoration: BoxDecoration(
-                      color: searchBgColor, // 🌟 डायनामिक सर्च बार कलर
+                      color: searchBgColor, 
                       borderRadius: BorderRadius.circular(20),
                     ),
                     child: Row(
@@ -389,15 +386,17 @@ class _YouTubeHomeScreenState extends State<YouTubeHomeScreen> {
                         const Text("Search", style: TextStyle(color: Colors.grey, fontSize: 15)),
                         const Spacer(), 
                         
+                        // 🌟 ISS BAAR YEH 100% VISIBLE CHAMKTA HUA MIC ICON HAI 🌟
                         GestureDetector(
                           onTap: _startVoiceSearch,
                           child: Container(
                             padding: const EdgeInsets.all(7),
                             decoration: BoxDecoration(
-                              color: isDarkMode ? Colors.grey[800] : Colors.grey[300], // 🌟 माइक का बैकग्राउंड
+                              color: isDarkMode ? Colors.grey[800] : Colors.grey[300], 
                               shape: BoxShape.circle,
                             ),
                             child: ShaderMask(
+                              blendMode: BlendMode.srcIn, // 🌟 ISS LINE SE MIC GAYAB NAHI HOGA, COLORFUL DIKHEGA 🌟
                               shaderCallback: (Rect bounds) {
                                 return const LinearGradient(
                                   colors: [Colors.blue, Colors.redAccent, Colors.yellow, Colors.green],
@@ -405,7 +404,7 @@ class _YouTubeHomeScreenState extends State<YouTubeHomeScreen> {
                                   end: Alignment.bottomRight,
                                 ).createShader(bounds);
                               },
-                              child: const Icon(Icons.mic, color: Colors.white, size: 20),
+                              child: const Icon(Icons.mic, size: 20, color: Colors.white),
                             ),
                           ),
                         ),
@@ -421,7 +420,6 @@ class _YouTubeHomeScreenState extends State<YouTubeHomeScreen> {
               padding: const EdgeInsets.only(right: 12.0, left: 8.0),
               child: Center(
                 child: GestureDetector(
-                  // 🌟 प्रोफाइल पर क्लिक करते ही साइड-बार खुलेगा 🌟
                   onTap: () {
                     _scaffoldKey.currentState?.openEndDrawer(); 
                   },
@@ -438,7 +436,7 @@ class _YouTubeHomeScreenState extends State<YouTubeHomeScreen> {
         body: _buildBody(),
         bottomNavigationBar: BottomNavigationBar(
           backgroundColor: bgColor, 
-          selectedItemColor: isDarkMode ? Colors.white : Colors.black, // 🌟 डायनामिक
+          selectedItemColor: isDarkMode ? Colors.white : Colors.black, 
           unselectedItemColor: Colors.grey, 
           currentIndex: _selectedIndex, 
           type: BottomNavigationBarType.fixed, 
