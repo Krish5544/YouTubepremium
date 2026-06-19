@@ -1,17 +1,15 @@
-import 'dart:async';
 import 'dart:convert';
 import 'package:flutter/material.dart';
-import 'package:flutter/services.dart';
 import 'package:http/http.dart' as http;
-import 'package:youtube_player_flutter/youtube_player_flutter.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import 'package:youtube_player_flutter/youtube_player_flutter.dart';
 import 'package:share_plus/share_plus.dart';
-import 'package:flutter_volume_controller/flutter_volume_controller.dart';
-import 'package:screen_brightness/screen_brightness.dart';
+import 'channel_screen.dart';
 
 class VideoPlayerScreen extends StatefulWidget {
   final String videoId;
   final String title;
+
   const VideoPlayerScreen({super.key, required this.videoId, required this.title});
 
   @override
@@ -20,419 +18,308 @@ class VideoPlayerScreen extends StatefulWidget {
 
 class _VideoPlayerScreenState extends State<VideoPlayerScreen> {
   late YoutubePlayerController _controller;
-  bool _isPlayerReady = false;
-  bool _isDescriptionExpanded = false;
-  
-  List<Map<String, dynamic>> _relatedVideos = [];
-  bool _isLoadingRelated = true;
   final String apiKey = 'AIzaSyBpPAohs_WhlCTiozmCVMEzrGsRE86LgpU';
+
+  List<Map<String, dynamic>> relatedVideos = [];
+  bool isLoading = true;
+  bool isLoadingMore = false;
+  String? nextPageToken;
   
-  bool _isNavigatingToNext = false; 
-  bool _isFullScreenState = false;
+  bool isSaved = false;
+  bool isDarkMode = true;
 
-  // Watch Later का वेरिएबल
-  bool _isInWatchLater = false;
-
-  // 🌟 Subscribe फीचर के वेरिएबल्स 🌟
-  bool _isSubscribed = false;
-  String _channelId = "";
-  String _channelTitle = "ProTube Channel";
-
-  // MX Player जेस्चर के वेरिएबल्स
-  double _volume = 0.5;
-  double _brightness = 0.5;
-  bool _showIndicator = false;
-  IconData _indicatorIcon = Icons.volume_up;
-  String _indicatorText = "";
-  Timer? _indicatorTimer;
+  Color get bgColor => isDarkMode ? const Color(0xFF0F0F0F) : Colors.white;
+  Color get textColor => isDarkMode ? Colors.white : Colors.black;
+  Color get subTextColor => isDarkMode ? Colors.grey : Colors.grey[700]!;
 
   @override
   void initState() {
     super.initState();
-    _initPlayer();
-    _fetchVideoDetailsAndRelated(); // 🌟 यहाँ से चैनल ID भी मिलेगी
-    _initGestures();
-    _checkIfWatchLater(); 
+    _loadTheme();
+    _checkIfSaved();
+    _saveToHistory();
+    
+    _controller = YoutubePlayerController(
+      initialVideoId: widget.videoId,
+      flags: const YoutubePlayerFlags(
+        autoPlay: true,
+        mute: false,
+      ),
+    );
+
+    _loadRelatedVideos(isRefresh: true);
   }
 
-  Future<void> _checkIfWatchLater() async {
+  Future<void> _loadTheme() async {
+    final prefs = await SharedPreferences.getInstance();
+    if (mounted) {
+      setState(() {
+        isDarkMode = prefs.getBool('isDarkMode') ?? true;
+      });
+    }
+  }
+
+  // 🌟 वॉच लेटर में चेक करने का लॉजिक
+  Future<void> _checkIfSaved() async {
     final prefs = await SharedPreferences.getInstance();
     List<String> savedList = prefs.getStringList('watch_later') ?? [];
-    bool exists = false;
-    for (String item in savedList) {
-      try {
-        if (jsonDecode(item)['id'] == widget.videoId) { exists = true; break; }
-      } catch(e) {}
-    }
-    if (mounted) setState(() => _isInWatchLater = exists);
+    setState(() {
+      isSaved = savedList.any((item) => jsonDecode(item)['id'] == widget.videoId);
+    });
   }
 
-  // 🌟 चेक करने का फंक्शन कि चैनल पहले से सब्सक्राइब है या नहीं 🌟
-  Future<void> _checkSubscription() async {
-    if (_channelId.isEmpty) return;
-    final prefs = await SharedPreferences.getInstance();
-    List<String> subList = prefs.getStringList('subscribed_channels') ?? [];
-    bool exists = subList.contains(_channelId);
-    if (mounted) setState(() => _isSubscribed = exists);
-  }
-
-  // 🌟 चैनल को सब्सक्राइब/अनसब्सक्राइब करने का जादुई फंक्शन 🌟
-  Future<void> _toggleSubscription() async {
-    if (_channelId.isEmpty) return;
-    final prefs = await SharedPreferences.getInstance();
-    List<String> subList = prefs.getStringList('subscribed_channels') ?? [];
-
-    if (_isSubscribed) {
-      subList.remove(_channelId);
-      if (mounted) setState(() => _isSubscribed = false);
-      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text("$_channelTitle को अनसब्सक्राइब कर दिया"), backgroundColor: Colors.red));
-    } else {
-      subList.add(_channelId);
-      if (mounted) setState(() => _isSubscribed = true);
-      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text("$_channelTitle सब्सक्राइब हो गया!"), backgroundColor: Colors.green));
-    }
-    prefs.setStringList('subscribed_channels', subList);
-  }
-
-  // 🌟 वीडियो की पूरी जानकारी और चैनल ID निकालने का फंक्शन 🌟
-  Future<void> _fetchVideoDetailsAndRelated() async {
-    try {
-      // पहले वीडियो की डिटेल्स निकालकर उसकी ChannelId लेंगे
-      String detailsUrl = 'https://www.googleapis.com/youtube/v3/videos?part=snippet&id=${widget.videoId}&key=$apiKey';
-      var detailsRes = await http.get(Uri.parse(detailsUrl));
-      var detailsData = jsonDecode(detailsRes.body);
-      if (detailsData['items'] != null && detailsData['items'].isNotEmpty) {
-        var snippet = detailsData['items'][0]['snippet'];
-        _channelId = snippet['channelId'] ?? "";
-        _channelTitle = snippet['channelTitle'] ?? "ProTube Channel";
-        _checkSubscription(); // चैनल ID मिलते ही सब्सक्राइब स्टेटस चेक करो
-      }
-
-      // अब रिलेटेड वीडियोज़ लोड करेंगे
-      String query = Uri.encodeComponent(widget.title.split(' ').take(3).join(' '));
-      String url = 'https://www.googleapis.com/youtube/v3/search?part=snippet&maxResults=15&q=$query&type=video&key=$apiKey';
-      var res = await http.get(Uri.parse(url));
-      var data = jsonDecode(res.body);
-      List items = data['items'] ?? [];
-      
-      List<Map<String, dynamic>> newResults = [];
-      for (var item in items) {
-        if (item['id']['videoId'] != widget.videoId) {
-          newResults.add({
-            'id': item['id']['videoId'], 'title': item['snippet']['title'],
-            'thumbnail': item['snippet']['thumbnails']['high']?['url'] ?? '',
-            'channel': item['snippet']['channelTitle'], 'date': item['snippet']['publishedAt'],
-          });
-        }
-      }
-      if (mounted) setState(() { _relatedVideos = newResults; _isLoadingRelated = false; });
-    } catch (e) {
-      if (mounted) setState(() => _isLoadingRelated = false);
-    }
-  }
-
+  // 🌟 वॉच लेटर में सेव/रिमूव करने का लॉजिक
   Future<void> _toggleWatchLater() async {
     final prefs = await SharedPreferences.getInstance();
     List<String> savedList = prefs.getStringList('watch_later') ?? [];
-    Map<String, dynamic> videoData = {'id': widget.videoId, 'title': widget.title};
-    String videoJson = jsonEncode(videoData);
 
-    if (_isInWatchLater) {
+    if (isSaved) {
       savedList.removeWhere((item) => jsonDecode(item)['id'] == widget.videoId);
-      if (mounted) setState(() => _isInWatchLater = false);
-      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text("Watch Later से हटा दिया गया"), backgroundColor: Colors.red));
+      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Removed from Watch Later')));
     } else {
-      savedList.insert(0, videoJson);
-      if (mounted) setState(() => _isInWatchLater = true);
-      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text("Watch Later में जोड़ दिया गया"), backgroundColor: Colors.green));
-    }
-    prefs.setStringList('watch_later', savedList);
-  }
-
-  Future<void> _initGestures() async {
-    try {
-      await FlutterVolumeController.updateShowSystemUI(false);
-      double? initVol = await FlutterVolumeController.getVolume();
-      if (initVol != null && mounted) setState(() => _volume = initVol);
-      double initBright = await ScreenBrightness().current;
-      if (mounted) setState(() => _brightness = initBright);
-    } catch (e) { }
-  }
-
-  Future<void> _initPlayer() async {
-    final prefs = await SharedPreferences.getInstance();
-    int startPosition = 0;
-    try {
-      List<String> historyList = prefs.getStringList('video_history') ?? [];
-      for (String item in historyList) {
-        Map<String, dynamic> data = jsonDecode(item);
-        if (data['id'] == widget.videoId) { startPosition = data['position'] ?? 0; break; }
-      }
-    } catch (e) { }
-
-    _controller = YoutubePlayerController(
-      initialVideoId: widget.videoId,
-      flags: YoutubePlayerFlags(autoPlay: true, mute: false, startAt: startPosition),
-    )..addListener(_videoListener);
-
-    if (mounted) setState(() => _isPlayerReady = true);
-  }
-
-  void _videoListener() async {
-    if (_controller.value.isFullScreen != _isFullScreenState) {
-      _isFullScreenState = _controller.value.isFullScreen;
-      if (_isFullScreenState) {
-        SystemChrome.setPreferredOrientations([DeviceOrientation.landscapeLeft, DeviceOrientation.landscapeRight]);
-        SystemChrome.setEnabledSystemUIMode(SystemUiMode.immersiveSticky);
-      } else {
-        SystemChrome.setPreferredOrientations([DeviceOrientation.portraitUp]);
-        SystemChrome.setEnabledSystemUIMode(SystemUiMode.edgeToEdge);
-      }
-      if (mounted) setState(() {}); 
-    }
-
-    if (_controller.value.isReady && !_isNavigatingToNext) {
-      final prefs = await SharedPreferences.getInstance();
-      List<String> historyList = prefs.getStringList('video_history') ?? [];
-      historyList.removeWhere((item) => jsonDecode(item)['id'] == widget.videoId);
-      Map<String, dynamic> newData = {
-        'id': widget.videoId, 'title': widget.title,
-        'position': _controller.value.position.inSeconds, 'timestamp': DateTime.now().millisecondsSinceEpoch,
+      Map<String, dynamic> videoData = {
+        'id': widget.videoId,
+        'title': widget.title,
       };
-      historyList.insert(0, jsonEncode(newData));
-      prefs.setStringList('video_history', historyList);
+      savedList.add(jsonEncode(videoData));
+      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Saved to Watch Later')));
     }
 
-    if (_controller.value.playerState == PlayerState.ended && !_isNavigatingToNext) {
-      _isNavigatingToNext = true; 
-      if (_relatedVideos.isNotEmpty) {
-        Future.delayed(const Duration(seconds: 1), () {
-          if (mounted) {
-            final nextVideo = _relatedVideos[0];
-            Navigator.pushReplacement(context, MaterialPageRoute(builder: (context) => VideoPlayerScreen(videoId: nextVideo['id'], title: nextVideo['title'])));
-          }
-        });
-      }
+    await prefs.setStringList('watch_later', savedList);
+    setState(() {
+      isSaved = !isSaved;
+    });
+  }
+
+  // 🌟 हिस्ट्री में सेव करने का लॉजिक
+  Future<void> _saveToHistory() async {
+    final prefs = await SharedPreferences.getInstance();
+    List<String> historyList = prefs.getStringList('video_history') ?? [];
+    
+    historyList.removeWhere((item) => jsonDecode(item)['id'] == widget.videoId);
+    
+    Map<String, dynamic> historyData = {
+      'id': widget.videoId,
+      'title': widget.title,
+      'position': 0, // position can be updated later via listener if needed
+    };
+    
+    historyList.insert(0, jsonEncode(historyData));
+    if (historyList.length > 100) historyList = historyList.sublist(0, 100);
+    
+    await prefs.setStringList('video_history', historyList);
+  }
+
+  // 🌟 अनलिमिटेड रिलेटेड वीडियोज़ लोडिंग (जादुई 50% प्री-लोडिंग के साथ) 🌟
+  Future<void> _loadRelatedVideos({bool isRefresh = false}) async {
+    if (isRefresh) {
+      setState(() { isLoading = true; relatedVideos.clear(); nextPageToken = null; });
+    } else {
+      if (nextPageToken == null || isLoadingMore) return;
+      setState(() => isLoadingMore = true);
     }
+
+    try {
+      // YouTube ने relatedToVideoId बंद कर दिया है, इसलिए हम वीडियो के टाइटल से सर्च करके एकदम सटीक रिलेटेड वीडियोज़ निकालते हैं
+      String query = Uri.encodeComponent(widget.title.split('|').first.split('-').first);
+      String url = 'https://www.googleapis.com/youtube/v3/search?part=snippet&maxResults=20&q=$query&type=video&key=$apiKey';
+      if (nextPageToken != null) url += '&pageToken=$nextPageToken';
+
+      var res = await http.get(Uri.parse(url));
+      var data = jsonDecode(res.body);
+      nextPageToken = data['nextPageToken'];
+      List items = data['items'] ?? [];
+      
+      if (items.isNotEmpty) {
+        List<Map<String, dynamic>> newResults = [];
+        List<String> videoIds = items.map((item) => item['id']['videoId'].toString()).toList();
+        
+        // वीडियो के डिटेल (Duration, Views) निकालने का कोड
+        var detailsRes = await http.get(Uri.parse('https://www.googleapis.com/youtube/v3/videos?part=snippet,contentDetails,statistics&id=${videoIds.join(',')}&key=$apiKey'));
+        var vDetails = jsonDecode(detailsRes.body)['items'] ?? [];
+        
+        // चैनल के लोगो निकालने का कोड
+        Set<String> channelIds = vDetails.map<String>((e) => e['snippet']['channelId'].toString()).toSet();
+        var channelRes = await http.get(Uri.parse('https://www.googleapis.com/youtube/v3/channels?part=snippet&id=${channelIds.take(50).join(',')}&key=$apiKey'));
+        Map<String, String> channelLogos = {};
+        if (jsonDecode(channelRes.body)['items'] != null) {
+          for (var ch in jsonDecode(channelRes.body)['items']) {
+            channelLogos[ch['id']] = ch['snippet']['thumbnails']['default']?['url'] ?? '';
+          }
+        }
+
+        for (var v in vDetails) {
+          // जो वीडियो चल रही है, उसे दोबारा लिस्ट में नहीं दिखाना
+          if (v['id'] == widget.videoId) continue; 
+
+          newResults.add({
+            'id': v['id'], 'title': v['snippet']['title'], 'thumbnail': v['snippet']['thumbnails']['high']?['url'] ?? '',
+            'author': v['snippet']['channelTitle'], 'channelId': v['snippet']['channelId'],
+            'channelLogo': channelLogos[v['snippet']['channelId']] ?? '', 'date': v['snippet']['publishedAt'],
+            'durationStr': _formatDuration(_parseDuration(v['contentDetails']['duration'])), 'views': v['statistics']['viewCount'] ?? '0'
+          });
+        }
+        if (mounted) setState(() { relatedVideos.addAll(newResults); isLoading = false; isLoadingMore = false; });
+      } else { if (mounted) setState(() { isLoading = false; isLoadingMore = false; }); }
+    } catch (e) { if (mounted) setState(() { isLoading = false; isLoadingMore = false; }); }
+  }
+
+  int _parseDuration(String isoDuration) {
+    RegExp reg = RegExp(r'PT(?:(\d+)H)?(?:(\d+)M)?(?:(\d+)S)?');
+    var match = reg.firstMatch(isoDuration);
+    int h = int.parse(match?.group(1) ?? '0'); int m = int.parse(match?.group(2) ?? '0'); int s = int.parse(match?.group(3) ?? '0');
+    return h * 3600 + m * 60 + s;
+  }
+
+  String _formatDuration(int totalSeconds) {
+    int h = totalSeconds ~/ 3600; int m = (totalSeconds % 3600) ~/ 60; int s = totalSeconds % 60;
+    return h > 0 ? '$h:${m.toString().padLeft(2, '0')}:${s.toString().padLeft(2, '0')}' : '$m:${s.toString().padLeft(2, '0')}';
+  }
+
+  String _formatViews(String viewsStr) {
+    int views = int.tryParse(viewsStr) ?? 0;
+    if (views >= 10000000) return '${(views / 10000000).toStringAsFixed(1)} करोड़';
+    if (views >= 100000) return '${(views / 100000).toStringAsFixed(1)} लाख';
+    if (views >= 1000) return '${(views / 1000).toStringAsFixed(1)}K';
+    return views.toString();
   }
 
   @override
   void dispose() {
-    _controller.removeListener(_videoListener);
     _controller.dispose();
-    SystemChrome.setPreferredOrientations([DeviceOrientation.portraitUp]);
-    SystemChrome.setEnabledSystemUIMode(SystemUiMode.edgeToEdge);
-    FlutterVolumeController.updateShowSystemUI(true);
     super.dispose();
-  }
-
-  void _changeVolume(double delta) {
-    setState(() {
-      _volume += delta; if (_volume > 1.0) _volume = 1.0; if (_volume < 0.0) _volume = 0.0;
-      FlutterVolumeController.setVolume(_volume);
-      _indicatorIcon = _volume > 0 ? Icons.volume_up : Icons.volume_off;
-      _indicatorText = "${(_volume * 100).toInt()}%"; _showIndicator = true;
-    });
-    _indicatorTimer?.cancel();
-    _indicatorTimer = Timer(const Duration(seconds: 2), () { if (mounted) setState(() => _showIndicator = false); });
-  }
-
-  void _changeBrightness(double delta) {
-    setState(() {
-      _brightness += delta; if (_brightness > 1.0) _brightness = 1.0; if (_brightness < 0.0) _brightness = 0.0;
-      ScreenBrightness().setScreenBrightness(_brightness);
-      _indicatorIcon = Icons.brightness_6; _indicatorText = "${(_brightness * 100).toInt()}%"; _showIndicator = true;
-    });
-    _indicatorTimer?.cancel();
-    _indicatorTimer = Timer(const Duration(seconds: 2), () { if (mounted) setState(() => _showIndicator = false); });
-  }
-
-  void _shareVideo() {
-    final String youtubeLink = 'https://youtu.be/${widget.videoId}';
-    Share.share('इस शानदार वीडियो को ProTube पर देखें:\n${widget.title}\n\nलिंक: $youtubeLink');
-  }
-
-  String _formatDate(String dateStr) {
-    try { DateTime date = DateTime.parse(dateStr); return "${date.day}/${date.month}/${date.year}"; } catch(e) { return ""; }
-  }
-
-  Widget _buildGestureOverlay() {
-    return Column(
-      children: [
-        Expanded(
-          flex: 8,
-          child: Row(
-            children: [
-              Expanded(
-                flex: 3,
-                child: GestureDetector(
-                  behavior: HitTestBehavior.translucent,
-                  onVerticalDragUpdate: (details) => _changeBrightness(-details.primaryDelta! / 200),
-                  onDoubleTap: () {
-                    _controller.seekTo(_controller.value.position - const Duration(seconds: 10));
-                    setState(() { _indicatorIcon = Icons.fast_rewind; _indicatorText = "-10s"; _showIndicator = true; });
-                    _indicatorTimer?.cancel(); _indicatorTimer = Timer(const Duration(seconds: 1), () { if (mounted) setState(() => _showIndicator = false); });
-                  },
-                  child: Container(),
-                ),
-              ),
-              Expanded(flex: 4, child: IgnorePointer(child: Container())),
-              Expanded(
-                flex: 3,
-                child: GestureDetector(
-                  behavior: HitTestBehavior.translucent,
-                  onVerticalDragUpdate: (details) => _changeVolume(-details.primaryDelta! / 200),
-                  onDoubleTap: () {
-                    _controller.seekTo(_controller.value.position + const Duration(seconds: 10));
-                    setState(() { _indicatorIcon = Icons.fast_forward; _indicatorText = "+10s"; _showIndicator = true; });
-                    _indicatorTimer?.cancel(); _indicatorTimer = Timer(const Duration(seconds: 1), () { if (mounted) setState(() => _showIndicator = false); });
-                  },
-                  child: Container(),
-                ),
-              ),
-            ],
-          ),
-        ),
-        Expanded(flex: 2, child: IgnorePointer(child: Container())),
-      ],
-    );
   }
 
   @override
   Widget build(BuildContext context) {
-    if (!_isPlayerReady) return const Scaffold(backgroundColor: Color(0xFF0F0F0F), body: Center(child: CircularProgressIndicator(color: Colors.red)));
-
-    return WillPopScope(
-      onWillPop: () async { if (_isFullScreenState) { _controller.toggleFullScreenMode(); return false; } return true; },
-      child: OrientationBuilder(
-        builder: (context, orientation) {
-          bool isLandscape = orientation == Orientation.landscape;
-          
-          Widget playerWidget = Stack(
-            alignment: Alignment.center,
-            children: [
-              YoutubePlayer(
-                controller: _controller,
-                showVideoProgressIndicator: true,
-                progressColors: const ProgressBarColors(playedColor: Colors.red, handleColor: Colors.redAccent),
-                bottomActions: const [CurrentPosition(), ProgressBar(isExpanded: true), RemainingDuration(), FullScreenButton()],
+    return Scaffold(
+      backgroundColor: bgColor,
+      body: SafeArea(
+        child: Column(
+          children: [
+            // 📺 यूट्यूब प्लेयर
+            YoutubePlayer(
+              controller: _controller,
+              showVideoProgressIndicator: true,
+              progressIndicatorColor: Colors.red,
+              progressColors: const ProgressBarColors(
+                playedColor: Colors.red,
+                handleColor: Colors.redAccent,
               ),
-              if (isLandscape) Positioned.fill(child: _buildGestureOverlay()),
-              if (_showIndicator && isLandscape)
-                Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 16),
-                  decoration: BoxDecoration(color: Colors.black.withOpacity(0.8), borderRadius: BorderRadius.circular(16)),
-                  child: Column(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [Icon(_indicatorIcon, color: Colors.white, size: 40), const SizedBox(height: 8), Text(_indicatorText, style: const TextStyle(color: Colors.white, fontSize: 18, fontWeight: FontWeight.bold))],
+            ),
+            
+            // 📜 टाइटल और बटन्स
+            Padding(
+              padding: const EdgeInsets.all(16.0),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    widget.title,
+                    style: TextStyle(color: textColor, fontSize: 18, fontWeight: FontWeight.bold),
+                    maxLines: 2,
+                    overflow: TextOverflow.ellipsis,
                   ),
-                ),
-            ],
-          );
-
-          return Scaffold(
-            backgroundColor: const Color(0xFF0F0F0F),
-            body: SafeArea(
-              child: isLandscape 
-                ? Center(child: playerWidget)
-                : Column(
+                  const SizedBox(height: 16),
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceEvenly,
                     children: [
-                      playerWidget,
-                      Expanded(
-                        child: ListView(
-                          padding: const EdgeInsets.symmetric(horizontal: 12.0, vertical: 14.0),
-                          children: [
-                            Text(widget.title, style: const TextStyle(color: Colors.white, fontSize: 17, fontWeight: FontWeight.bold, height: 1.3), maxLines: 2, overflow: TextOverflow.ellipsis),
-                            const SizedBox(height: 12),
-                            Row(
-                              children: [
-                                const CircleAvatar(radius: 16, backgroundColor: Colors.red, child: Icon(Icons.play_arrow, color: Colors.white, size: 16)),
-                                const SizedBox(width: 10),
-                                Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [Text(_channelTitle, style: const TextStyle(color: Colors.white, fontSize: 14, fontWeight: FontWeight.bold)), const Text("ProTube Channel", style: TextStyle(color: Colors.grey, fontSize: 11))])),
-                                
-                                // 🌟 यह रहा हमारा एकदम असली, एक्टिव 'Subscribe' बटन 🌟
-                                GestureDetector(
-                                  onTap: _toggleSubscription,
-                                  child: Container(
-                                    padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-                                    decoration: BoxDecoration(
-                                      color: _isSubscribed ? Colors.white12 : Colors.white,
-                                      borderRadius: BorderRadius.circular(20),
-                                    ),
-                                    child: Text(
-                                      _isSubscribed ? "Subscribed" : "Subscribe", 
-                                      style: TextStyle(color: _isSubscribed ? Colors.grey : Colors.black, fontSize: 12, fontWeight: FontWeight.bold)
-                                    ),
-                                  ),
-                                ),
-                              ],
-                            ),
-                            const SizedBox(height: 14),
-                            SingleChildScrollView(
-                              scrollDirection: Axis.horizontal,
-                              child: Row(
-                                children: [
-                                  _buildPillButton(icon: Icons.thumb_up_outlined, label: "Like", onTap: () {}), const SizedBox(width: 8),
-                                  _buildPillButton(icon: Icons.share_outlined, label: "Share", onTap: _shareVideo), const SizedBox(width: 8),
-                                  _buildPillButton(
-                                    icon: _isInWatchLater ? Icons.watch_later : Icons.watch_later_outlined, 
-                                    label: _isInWatchLater ? "Added" : "Watch Later", 
-                                    onTap: _toggleWatchLater,
-                                    iconColor: _isInWatchLater ? Colors.blueAccent : Colors.white,
-                                  ),
-                                ],
-                              ),
-                            ),
-                            const SizedBox(height: 14),
-                            GestureDetector(
-                              onTap: () { setState(() { _isDescriptionExpanded = !_isDescriptionExpanded; }); },
-                              child: Container(
-                                width: double.infinity, padding: const EdgeInsets.all(12), decoration: BoxDecoration(color: Colors.white10, borderRadius: BorderRadius.circular(12)),
-                                child: Column(
-                                  crossAxisAlignment: CrossAxisAlignment.start,
-                                  children: [
-                                    Text(_isDescriptionExpanded ? "ProTube ऐप में आपका स्वागत है। इस वीडियो में हमने आगामी परीक्षाओं के लिए महत्वपूर्ण विषयों को कवर किया है।\n\nअपनी तैयारी को मजबूत करने के लिए पूरी वीडियो देखें और हमारे चैनल को सपोर्ट करें।" : "ProTube ऐप में आपका स्वागत है। इस वीडियो में...", style: const TextStyle(color: Colors.white, fontSize: 13, height: 1.4), maxLines: _isDescriptionExpanded ? 100 : 2, overflow: TextOverflow.ellipsis),
-                                    const SizedBox(height: 6),
-                                    Text(_isDescriptionExpanded ? "Show less" : "...more", style: const TextStyle(color: Colors.white70, fontSize: 12, fontWeight: FontWeight.bold)),
-                                  ],
-                                ),
-                              ),
-                            ),
-                            const SizedBox(height: 16),
-                            const Divider(color: Colors.white12, thickness: 1),
-                            const SizedBox(height: 10),
-                            const Text("Up next", style: TextStyle(color: Colors.white, fontSize: 15, fontWeight: FontWeight.bold)),
-                            const SizedBox(height: 14),
-                            if (_isLoadingRelated) const Center(child: Padding(padding: EdgeInsets.all(20.0), child: CircularProgressIndicator(color: Colors.red)))
-                            else if (_relatedVideos.isEmpty) const Center(child: Text("No related videos found", style: TextStyle(color: Colors.grey)))
-                            else ..._relatedVideos.map((video) => _buildRealRelatedVideo(video)).toList(),
-                          ],
-                        ),
+                      _buildActionButton(Icons.thumb_up_alt_outlined, "Like"),
+                      GestureDetector(
+                        onTap: () {
+                          Share.share('Check out this awesome video on ProTube: https://youtu.be/${widget.videoId}');
+                        },
+                        child: _buildActionButton(Icons.share, "Share"),
+                      ),
+                      GestureDetector(
+                        onTap: _toggleWatchLater,
+                        child: _buildActionButton(isSaved ? Icons.bookmark : Icons.bookmark_border, isSaved ? "Saved" : "Save", color: isSaved ? Colors.red : textColor),
                       ),
                     ],
                   ),
+                ],
+              ),
             ),
-          );
-        },
+            
+            Divider(color: isDarkMode ? Colors.white24 : Colors.black12, thickness: 1, height: 1),
+
+            // 🌟 अनलिमिटेड रिलेटेड वीडियोज़ की लिस्ट (50% स्क्रॉल लॉजिक के साथ) 🌟
+            Expanded(
+              child: isLoading 
+              ? const Center(child: CircularProgressIndicator(color: Colors.red))
+              : NotificationListener<ScrollNotification>(
+                  onNotification: (ScrollNotification scrollInfo) {
+                    if (!isLoadingMore && scrollInfo.metrics.pixels >= scrollInfo.metrics.maxScrollExtent * 0.5) {
+                      _loadRelatedVideos(); 
+                    }
+                    return true;
+                  },
+                  child: ListView.builder(
+                    itemCount: relatedVideos.length + (nextPageToken != null ? 1 : 0),
+                    itemBuilder: (context, index) {
+                      if (index == relatedVideos.length) return const Padding(padding: EdgeInsets.all(20.0), child: Center(child: CircularProgressIndicator(color: Colors.red)));
+                      
+                      final item = relatedVideos[index];
+                      return _buildRelatedVideoCard(
+                        item['id'], item['title'], item['thumbnail'], 
+                        "${item['author']} • ${_formatViews(item['views'])} views", 
+                        item['durationStr'], item['channelId'], item['channelLogo']
+                      );
+                    },
+                  ),
+                ),
+            ),
+          ],
+        ),
       ),
     );
   }
 
-  Widget _buildPillButton({required IconData icon, required String label, required VoidCallback onTap, Color iconColor = Colors.white}) {
-    return InkWell(onTap: onTap, borderRadius: BorderRadius.circular(20), child: Container(padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 7), decoration: BoxDecoration(color: Colors.white10, borderRadius: BorderRadius.circular(20)), child: Row(children: [Icon(icon, color: iconColor, size: 18), const SizedBox(width: 6), Text(label, style: const TextStyle(color: Colors.white, fontSize: 12, fontWeight: FontWeight.bold))])));
+  Widget _buildActionButton(IconData icon, String label, {Color? color}) {
+    return Column(
+      children: [
+        Icon(icon, color: color ?? textColor, size: 24),
+        const SizedBox(height: 6),
+        Text(label, style: TextStyle(color: color ?? textColor, fontSize: 12, fontWeight: FontWeight.w500)),
+      ],
+    );
   }
 
-  Widget _buildRealRelatedVideo(Map<String, dynamic> video) {
+  Widget _buildRelatedVideoCard(String videoId, String title, String imageUrl, String subtitleText, String durationText, String channelId, String channelLogoUrl) {
     return GestureDetector(
-      onTap: () { Navigator.pushReplacement(context, MaterialPageRoute(builder: (context) => VideoPlayerScreen(videoId: video['id'], title: video['title']))); },
+      onTap: () {
+        // जब किसी रिलेटेड वीडियो पर क्लिक करें, तो प्लेयर को उसी वीडियो के साथ अपडेट कर दो
+        Navigator.pushReplacement(context, MaterialPageRoute(builder: (context) => VideoPlayerScreen(videoId: videoId, title: title)));
+      },
       child: Padding(
-        padding: const EdgeInsets.only(bottom: 16.0),
+        padding: const EdgeInsets.symmetric(horizontal: 12.0, vertical: 8.0),
         child: Row(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            ClipRRect(borderRadius: BorderRadius.circular(8), child: Image.network(video['thumbnail'], width: 140, height: 80, fit: BoxFit.cover, errorBuilder: (c, e, s) => Container(width: 140, height: 80, color: Colors.grey[800]))),
+            // थंबनेल
+            Stack(
+              alignment: Alignment.bottomRight,
+              children: [
+                ClipRRect(
+                  borderRadius: BorderRadius.circular(8),
+                  child: Image.network(imageUrl, height: 90, width: 160, fit: BoxFit.cover, errorBuilder: (c, e, s) => Container(height: 90, width: 160, color: isDarkMode ? Colors.grey[900] : Colors.grey[300])),
+                ),
+                if (durationText.isNotEmpty) 
+                  Container(margin: const EdgeInsets.all(4), padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 2), decoration: BoxDecoration(color: Colors.black.withOpacity(0.8), borderRadius: BorderRadius.circular(4)), child: Text(durationText, style: const TextStyle(color: Colors.white, fontSize: 10, fontWeight: FontWeight.bold))),
+              ],
+            ),
             const SizedBox(width: 12),
-            Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [Text(video['title'], style: const TextStyle(color: Colors.white, fontSize: 14, fontWeight: FontWeight.bold), maxLines: 2, overflow: TextOverflow.ellipsis), const SizedBox(height: 4), Text("${video['channel']} • ${_formatDate(video['date'])}", style: const TextStyle(color: Colors.grey, fontSize: 11), maxLines: 2, overflow: TextOverflow.ellipsis)])),
+            // टाइटल और डिटेल्स
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(title, style: TextStyle(color: textColor, fontSize: 14, fontWeight: FontWeight.w500), maxLines: 2, overflow: TextOverflow.ellipsis),
+                  const SizedBox(height: 6),
+                  Text(subtitleText, style: TextStyle(color: subTextColor, fontSize: 12)),
+                ],
+              ),
+            ),
           ],
         ),
       ),
