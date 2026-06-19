@@ -35,7 +35,6 @@ class _YouTubeHomeScreenState extends State<YouTubeHomeScreen> {
   bool _isLoadingSubscriptions = false;
   bool _isLoadingMoreSubs = false;
   
-  // 🌟 अनलिमिटेड स्क्रॉलिंग का जादुई सिस्टम 🌟
   Map<String, String> _subPageTokens = {}; 
   bool _hasMoreSubs = true;
 
@@ -161,10 +160,9 @@ class _YouTubeHomeScreenState extends State<YouTubeHomeScreen> {
     setState(() => _watchLaterData = savedList.map((item) => jsonDecode(item) as Map<String, dynamic>).toList());
   }
 
-  // 🌟 अनलिमिटेड पेजिंग वाला सब्सक्रिप्शन लोडर 🌟
   Future<void> _loadSubscriptions({bool isRefresh = false}) async {
     if (isRefresh) {
-      _subPageTokens.clear(); // रिफ्रेश करने पर डायरी खाली कर दो
+      _subPageTokens.clear(); 
       if (mounted) setState(() { _isLoadingSubscriptions = true; _subscriptionsData.clear(); _subscribedChannelsDetails.clear(); _hasMoreSubs = true; });
     } else {
       if (_isLoadingMoreSubs || !_hasMoreSubs) return;
@@ -180,7 +178,7 @@ class _YouTubeHomeScreenState extends State<YouTubeHomeScreen> {
     }
 
     try {
-      var topChannels = subChannels.take(10).toList(); // टॉप 10 चैनल्स की हिस्ट्री लाएगा
+      var topChannels = subChannels.take(10).toList(); 
 
       if (isRefresh) {
         var channelRes = await http.get(Uri.parse('https://www.googleapis.com/youtube/v3/channels?part=snippet&id=${topChannels.join(',')}&key=$apiKey'));
@@ -199,18 +197,18 @@ class _YouTubeHomeScreenState extends State<YouTubeHomeScreen> {
       
       for (String cId in topChannels) {
         String? token = _subPageTokens[cId];
-        if (token == 'END') continue; // अगर इस चैनल की सारी वीडियोज़ खत्म हो गईं, तो इसे छोड़ दो
+        if (token == 'END') continue; 
 
-        String url = 'https://www.googleapis.com/youtube/v3/search?part=snippet&channelId=$cId&maxResults=10&order=date&type=video&key=$apiKey';
+        String url = 'https://www.googleapis.com/youtube/v3/search?part=snippet&channelId=$cId&maxResults=50&order=date&type=video&key=$apiKey';
         if (token != null && token.isNotEmpty) {
-          url += '&pageToken=$token'; // 🌟 अगली पेज की वीडियोज़ लाओ
+          url += '&pageToken=$token'; 
         }
 
         var res = await http.get(Uri.parse(url));
         if (res.statusCode == 200) {
           var data = jsonDecode(res.body);
           String? nextToken = data['nextPageToken'];
-          _subPageTokens[cId] = nextToken ?? 'END'; // डायरी में अगला पेज सेव करो
+          _subPageTokens[cId] = nextToken ?? 'END'; 
           if (nextToken != null) anyChannelHasMore = true;
 
           List items = data['items'] ?? [];
@@ -245,10 +243,10 @@ class _YouTubeHomeScreenState extends State<YouTubeHomeScreen> {
       }
 
       newVideos.sort((a, b) => DateTime.parse(b['date']).compareTo(DateTime.parse(a['date'])));
-      _subscriptionsData.addAll(newVideos); // नई वीडियोज़ को नीचे जोड़ दो
+      _subscriptionsData.addAll(newVideos); 
       
       if (!anyChannelHasMore) {
-         _hasMoreSubs = false; // अगर किसी भी चैनल के पास वीडियोज़ नहीं बचीं, तो अनलिमिटेड लोडिंग रोक दो
+         _hasMoreSubs = false; 
       }
 
       if (mounted) setState(() { _isLoadingSubscriptions = false; _isLoadingMoreSubs = false; });
@@ -471,7 +469,8 @@ class _YouTubeHomeScreenState extends State<YouTubeHomeScreen> {
       
       return NotificationListener<ScrollNotification>(
         onNotification: (ScrollNotification scrollInfo) {
-          if (!isLoadingMore && scrollInfo.metrics.pixels >= scrollInfo.metrics.maxScrollExtent - 800) {
+          // 🌟 MAGIC FIX: 50% Scroll Hote hi next page background mein load hone lagega! 🌟
+          if (!isLoadingMore && scrollInfo.metrics.pixels >= scrollInfo.metrics.maxScrollExtent * 0.5) {
             _loadResults(currentQuery); 
           }
           return true;
@@ -522,8 +521,8 @@ class _YouTubeHomeScreenState extends State<YouTubeHomeScreen> {
           Expanded(
             child: NotificationListener<ScrollNotification>(
               onNotification: (ScrollNotification scrollInfo) {
-                // 🌟 जादुई बदलाव: अब स्क्रॉल करने पर यह रुकेगा नहीं! 🌟
-                if (!_isLoadingMoreSubs && _hasMoreSubs && scrollInfo.metrics.pixels >= scrollInfo.metrics.maxScrollExtent - 800) {
+                // 🌟 MAGIC FIX: 50% Scroll Hote hi next page background mein load hone lagega! 🌟
+                if (!_isLoadingMoreSubs && _hasMoreSubs && scrollInfo.metrics.pixels >= scrollInfo.metrics.maxScrollExtent * 0.5) {
                   _loadSubscriptions(isRefresh: false); 
                 }
                 return true;
