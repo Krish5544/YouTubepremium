@@ -27,6 +27,9 @@ class _VideoPlayerScreenState extends State<VideoPlayerScreen> {
   
   bool isSaved = false;
   bool isDarkMode = true;
+  
+  // 🌟 डिस्क्रिप्शन को छोटा-बड़ा करने वाला लॉजिक 🌟
+  bool isDescriptionExpanded = false;
 
   Color get bgColor => isDarkMode ? const Color(0xFF0F0F0F) : Colors.white;
   Color get textColor => isDarkMode ? Colors.white : Colors.black;
@@ -189,7 +192,7 @@ class _VideoPlayerScreenState extends State<VideoPlayerScreen> {
       body: SafeArea(
         child: Column(
           children: [
-            // 📺 यूट्यूब प्लेयर (यह अपनी जगह फिक्स रहेगा)
+            // 📺 यूट्यूब प्लेयर (हमेशा ऊपर रहेगा)
             YoutubePlayer(
               controller: _controller,
               showVideoProgressIndicator: true,
@@ -200,11 +203,11 @@ class _VideoPlayerScreenState extends State<VideoPlayerScreen> {
               ),
             ),
             
-            // 🌟 जादुई CustomScrollView (जिसमें सब कुछ एक साथ स्क्रॉल होगा) 🌟
+            // 🌟 CustomScrollView: स्क्रॉल करने पर सब कुछ ऊपर छुप जाएगा 🌟
             Expanded(
               child: NotificationListener<ScrollNotification>(
                 onNotification: (ScrollNotification scrollInfo) {
-                  // 50% स्क्रॉल होने पर अनलिमिटेड वीडियोज़ बैकग्राउंड में लोड होंगी
+                  // 🌟 फ़ास्ट लोडिंग (50% वाला लॉजिक जो तुमने बोला था) 🌟
                   if (!isLoadingMore && scrollInfo.metrics.pixels >= scrollInfo.metrics.maxScrollExtent * 0.5) {
                     _loadRelatedVideos(); 
                   }
@@ -212,44 +215,113 @@ class _VideoPlayerScreenState extends State<VideoPlayerScreen> {
                 },
                 child: CustomScrollView(
                   slivers: [
-                    // 📜 टाइटल और बटन्स (अब यह भी वीडियोज़ के साथ ऊपर स्क्रॉल होगा)
+                    // 📜 वीडियो का ओरिजिनल इंटरफ़ेस (Title, Channel, Buttons, Description)
                     SliverToBoxAdapter(
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Padding(
-                            padding: const EdgeInsets.all(16.0),
-                            child: Column(
-                              crossAxisAlignment: CrossAxisAlignment.start,
+                      child: Padding(
+                        padding: const EdgeInsets.all(12.0),
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            // 1. टाइटल
+                            Text(
+                              widget.title,
+                              style: TextStyle(color: textColor, fontSize: 18, fontWeight: FontWeight.bold),
+                              maxLines: 2,
+                              overflow: TextOverflow.ellipsis,
+                            ),
+                            const SizedBox(height: 12),
+                            
+                            // 2. चैनल का नाम और सब्सक्राइब बटन 🌟
+                            Row(
                               children: [
-                                Text(
-                                  widget.title,
-                                  style: TextStyle(color: textColor, fontSize: 18, fontWeight: FontWeight.bold),
-                                  maxLines: 2,
-                                  overflow: TextOverflow.ellipsis,
+                                CircleAvatar(
+                                  backgroundColor: isDarkMode ? Colors.grey[800] : Colors.grey[300],
+                                  child: Icon(Icons.person, color: isDarkMode ? Colors.white : Colors.black),
                                 ),
-                                const SizedBox(height: 16),
-                                Row(
-                                  mainAxisAlignment: MainAxisAlignment.spaceEvenly,
-                                  children: [
-                                    _buildActionButton(Icons.thumb_up_alt_outlined, "Like"),
-                                    GestureDetector(
-                                      onTap: () {
-                                        Share.share('Check out this awesome video on ProTube: https://youtu.be/${widget.videoId}');
-                                      },
-                                      child: _buildActionButton(Icons.share, "Share"),
-                                    ),
-                                    GestureDetector(
-                                      onTap: _toggleWatchLater,
-                                      child: _buildActionButton(isSaved ? Icons.bookmark : Icons.bookmark_border, isSaved ? "Saved" : "Save", color: isSaved ? Colors.red : textColor),
-                                    ),
-                                  ],
+                                const SizedBox(width: 10),
+                                Expanded(
+                                  child: Column(
+                                    crossAxisAlignment: CrossAxisAlignment.start,
+                                    children: [
+                                      Text("ProTube Channel", style: TextStyle(color: textColor, fontWeight: FontWeight.bold, fontSize: 15)),
+                                      Text("1.2M subscribers", style: TextStyle(color: subTextColor, fontSize: 12)),
+                                    ],
+                                  ),
                                 ),
+                                ElevatedButton(
+                                  style: ElevatedButton.styleFrom(
+                                    backgroundColor: isDarkMode ? Colors.white : Colors.black,
+                                    foregroundColor: isDarkMode ? Colors.black : Colors.white,
+                                    shape: const StadiumBorder(),
+                                    padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8)
+                                  ),
+                                  onPressed: () {}, // Subscribe Action
+                                  child: const Text("Subscribe", style: TextStyle(fontWeight: FontWeight.bold)),
+                                )
                               ],
                             ),
-                          ),
-                          Divider(color: isDarkMode ? Colors.white24 : Colors.black12, thickness: 1, height: 1),
-                        ],
+                            const SizedBox(height: 16),
+                            
+                            // 3. Like, Share, Watch Later (Download) वाले गोल बटन्स 🌟
+                            SingleChildScrollView(
+                              scrollDirection: Axis.horizontal,
+                              child: Row(
+                                children: [
+                                  _buildPillButton(Icons.thumb_up_alt_outlined, "Like", onTap: () {}),
+                                  const SizedBox(width: 8),
+                                  _buildPillButton(Icons.share, "Share", onTap: () {
+                                    Share.share('Check out this video: https://youtu.be/${widget.videoId}');
+                                  }),
+                                  const SizedBox(width: 8),
+                                  _buildPillButton(
+                                    isSaved ? Icons.bookmark : Icons.download, 
+                                    isSaved ? "Saved" : "Watch Later", 
+                                    onTap: _toggleWatchLater,
+                                    isActive: isSaved
+                                  ),
+                                ],
+                              ),
+                            ),
+                            const SizedBox(height: 16),
+
+                            // 4. ग्रे कलर का डिस्क्रिप्शन बॉक्स (छोटा/बड़ा होने वाला) 🌟
+                            GestureDetector(
+                              onTap: () {
+                                setState(() {
+                                  isDescriptionExpanded = !isDescriptionExpanded;
+                                });
+                              },
+                              child: Container(
+                                width: double.infinity,
+                                padding: const EdgeInsets.all(12),
+                                decoration: BoxDecoration(
+                                  color: isDarkMode ? Colors.grey[800] : Colors.grey[200],
+                                  borderRadius: BorderRadius.circular(12),
+                                ),
+                                child: Column(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                    Text("64K views  •  2 weeks ago", style: TextStyle(fontWeight: FontWeight.bold, color: textColor, fontSize: 13)),
+                                    const SizedBox(height: 4),
+                                    Text(
+                                      "Welcome to this amazing video! Here we discuss the important topics for your exams. Make sure to watch till the end.\n\n#ProTube #Education #Learning #Trending",
+                                      maxLines: isDescriptionExpanded ? null : 2,
+                                      overflow: isDescriptionExpanded ? TextOverflow.visible : TextOverflow.ellipsis,
+                                      style: TextStyle(color: textColor, fontSize: 13),
+                                    ),
+                                    if (!isDescriptionExpanded)
+                                      Padding(
+                                        padding: const EdgeInsets.only(top: 4.0),
+                                        child: Text("...more", style: TextStyle(fontWeight: FontWeight.bold, color: textColor)),
+                                      )
+                                  ],
+                                ),
+                              ),
+                            ),
+                            const SizedBox(height: 16),
+                            Divider(color: isDarkMode ? Colors.white24 : Colors.black12, thickness: 1, height: 1),
+                          ],
+                        ),
                       ),
                     ),
 
@@ -285,13 +357,24 @@ class _VideoPlayerScreenState extends State<VideoPlayerScreen> {
     );
   }
 
-  Widget _buildActionButton(IconData icon, String label, {Color? color}) {
-    return Column(
-      children: [
-        Icon(icon, color: color ?? textColor, size: 24),
-        const SizedBox(height: 6),
-        Text(label, style: TextStyle(color: color ?? textColor, fontSize: 12, fontWeight: FontWeight.w500)),
-      ],
+  // 🌟 गोल (Pill-shaped) बटन्स का डिज़ाइन 🌟
+  Widget _buildPillButton(IconData icon, String label, {required VoidCallback onTap, bool isActive = false}) {
+    return GestureDetector(
+      onTap: onTap,
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+        decoration: BoxDecoration(
+          color: isDarkMode ? Colors.grey[800] : Colors.grey[200],
+          borderRadius: BorderRadius.circular(20),
+        ),
+        child: Row(
+          children: [
+            Icon(icon, color: isActive ? Colors.red : textColor, size: 20),
+            const SizedBox(width: 6),
+            Text(label, style: TextStyle(color: isActive ? Colors.red : textColor, fontSize: 13, fontWeight: FontWeight.w500)),
+          ],
+        ),
+      ),
     );
   }
 
