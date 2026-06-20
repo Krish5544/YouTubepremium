@@ -59,7 +59,6 @@ class _VideoPlayerScreenState extends State<VideoPlayerScreen> {
     }
   }
 
-  // 🌟 वॉच लेटर में चेक करने का लॉजिक
   Future<void> _checkIfSaved() async {
     final prefs = await SharedPreferences.getInstance();
     List<String> savedList = prefs.getStringList('watch_later') ?? [];
@@ -68,7 +67,6 @@ class _VideoPlayerScreenState extends State<VideoPlayerScreen> {
     });
   }
 
-  // 🌟 वॉच लेटर में सेव/रिमूव करने का लॉजिक
   Future<void> _toggleWatchLater() async {
     final prefs = await SharedPreferences.getInstance();
     List<String> savedList = prefs.getStringList('watch_later') ?? [];
@@ -91,7 +89,6 @@ class _VideoPlayerScreenState extends State<VideoPlayerScreen> {
     });
   }
 
-  // 🌟 हिस्ट्री में सेव करने का लॉजिक
   Future<void> _saveToHistory() async {
     final prefs = await SharedPreferences.getInstance();
     List<String> historyList = prefs.getStringList('video_history') ?? [];
@@ -101,7 +98,7 @@ class _VideoPlayerScreenState extends State<VideoPlayerScreen> {
     Map<String, dynamic> historyData = {
       'id': widget.videoId,
       'title': widget.title,
-      'position': 0, // position can be updated later via listener if needed
+      'position': 0, 
     };
     
     historyList.insert(0, jsonEncode(historyData));
@@ -110,7 +107,6 @@ class _VideoPlayerScreenState extends State<VideoPlayerScreen> {
     await prefs.setStringList('video_history', historyList);
   }
 
-  // 🌟 अनलिमिटेड रिलेटेड वीडियोज़ लोडिंग (जादुई 50% प्री-लोडिंग के साथ) 🌟
   Future<void> _loadRelatedVideos({bool isRefresh = false}) async {
     if (isRefresh) {
       setState(() { isLoading = true; relatedVideos.clear(); nextPageToken = null; });
@@ -120,7 +116,6 @@ class _VideoPlayerScreenState extends State<VideoPlayerScreen> {
     }
 
     try {
-      // YouTube ने relatedToVideoId बंद कर दिया है, इसलिए हम वीडियो के टाइटल से सर्च करके एकदम सटीक रिलेटेड वीडियोज़ निकालते हैं
       String query = Uri.encodeComponent(widget.title.split('|').first.split('-').first);
       String url = 'https://www.googleapis.com/youtube/v3/search?part=snippet&maxResults=20&q=$query&type=video&key=$apiKey';
       if (nextPageToken != null) url += '&pageToken=$nextPageToken';
@@ -134,11 +129,9 @@ class _VideoPlayerScreenState extends State<VideoPlayerScreen> {
         List<Map<String, dynamic>> newResults = [];
         List<String> videoIds = items.map((item) => item['id']['videoId'].toString()).toList();
         
-        // वीडियो के डिटेल (Duration, Views) निकालने का कोड
         var detailsRes = await http.get(Uri.parse('https://www.googleapis.com/youtube/v3/videos?part=snippet,contentDetails,statistics&id=${videoIds.join(',')}&key=$apiKey'));
         var vDetails = jsonDecode(detailsRes.body)['items'] ?? [];
         
-        // चैनल के लोगो निकालने का कोड
         Set<String> channelIds = vDetails.map<String>((e) => e['snippet']['channelId'].toString()).toSet();
         var channelRes = await http.get(Uri.parse('https://www.googleapis.com/youtube/v3/channels?part=snippet&id=${channelIds.take(50).join(',')}&key=$apiKey'));
         Map<String, String> channelLogos = {};
@@ -149,7 +142,6 @@ class _VideoPlayerScreenState extends State<VideoPlayerScreen> {
         }
 
         for (var v in vDetails) {
-          // जो वीडियो चल रही है, उसे दोबारा लिस्ट में नहीं दिखाना
           if (v['id'] == widget.videoId) continue; 
 
           newResults.add({
@@ -197,7 +189,7 @@ class _VideoPlayerScreenState extends State<VideoPlayerScreen> {
       body: SafeArea(
         child: Column(
           children: [
-            // 📺 यूट्यूब प्लेयर
+            // 📺 यूट्यूब प्लेयर (यह अपनी जगह फिक्स रहेगा)
             YoutubePlayer(
               controller: _controller,
               showVideoProgressIndicator: true,
@@ -208,66 +200,84 @@ class _VideoPlayerScreenState extends State<VideoPlayerScreen> {
               ),
             ),
             
-            // 📜 टाइटल और बटन्स
-            Padding(
-              padding: const EdgeInsets.all(16.0),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    widget.title,
-                    style: TextStyle(color: textColor, fontSize: 18, fontWeight: FontWeight.bold),
-                    maxLines: 2,
-                    overflow: TextOverflow.ellipsis,
-                  ),
-                  const SizedBox(height: 16),
-                  Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceEvenly,
-                    children: [
-                      _buildActionButton(Icons.thumb_up_alt_outlined, "Like"),
-                      GestureDetector(
-                        onTap: () {
-                          Share.share('Check out this awesome video on ProTube: https://youtu.be/${widget.videoId}');
-                        },
-                        child: _buildActionButton(Icons.share, "Share"),
-                      ),
-                      GestureDetector(
-                        onTap: _toggleWatchLater,
-                        child: _buildActionButton(isSaved ? Icons.bookmark : Icons.bookmark_border, isSaved ? "Saved" : "Save", color: isSaved ? Colors.red : textColor),
-                      ),
-                    ],
-                  ),
-                ],
-              ),
-            ),
-            
-            Divider(color: isDarkMode ? Colors.white24 : Colors.black12, thickness: 1, height: 1),
-
-            // 🌟 अनलिमिटेड रिलेटेड वीडियोज़ की लिस्ट (50% स्क्रॉल लॉजिक के साथ) 🌟
+            // 🌟 जादुई CustomScrollView (जिसमें सब कुछ एक साथ स्क्रॉल होगा) 🌟
             Expanded(
-              child: isLoading 
-              ? const Center(child: CircularProgressIndicator(color: Colors.red))
-              : NotificationListener<ScrollNotification>(
-                  onNotification: (ScrollNotification scrollInfo) {
-                    if (!isLoadingMore && scrollInfo.metrics.pixels >= scrollInfo.metrics.maxScrollExtent * 0.5) {
-                      _loadRelatedVideos(); 
-                    }
-                    return true;
-                  },
-                  child: ListView.builder(
-                    itemCount: relatedVideos.length + (nextPageToken != null ? 1 : 0),
-                    itemBuilder: (context, index) {
-                      if (index == relatedVideos.length) return const Padding(padding: EdgeInsets.all(20.0), child: Center(child: CircularProgressIndicator(color: Colors.red)));
-                      
-                      final item = relatedVideos[index];
-                      return _buildRelatedVideoCard(
-                        item['id'], item['title'], item['thumbnail'], 
-                        "${item['author']} • ${_formatViews(item['views'])} views", 
-                        item['durationStr'], item['channelId'], item['channelLogo']
-                      );
-                    },
-                  ),
+              child: NotificationListener<ScrollNotification>(
+                onNotification: (ScrollNotification scrollInfo) {
+                  // 50% स्क्रॉल होने पर अनलिमिटेड वीडियोज़ बैकग्राउंड में लोड होंगी
+                  if (!isLoadingMore && scrollInfo.metrics.pixels >= scrollInfo.metrics.maxScrollExtent * 0.5) {
+                    _loadRelatedVideos(); 
+                  }
+                  return true;
+                },
+                child: CustomScrollView(
+                  slivers: [
+                    // 📜 टाइटल और बटन्स (अब यह भी वीडियोज़ के साथ ऊपर स्क्रॉल होगा)
+                    SliverToBoxAdapter(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Padding(
+                            padding: const EdgeInsets.all(16.0),
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Text(
+                                  widget.title,
+                                  style: TextStyle(color: textColor, fontSize: 18, fontWeight: FontWeight.bold),
+                                  maxLines: 2,
+                                  overflow: TextOverflow.ellipsis,
+                                ),
+                                const SizedBox(height: 16),
+                                Row(
+                                  mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+                                  children: [
+                                    _buildActionButton(Icons.thumb_up_alt_outlined, "Like"),
+                                    GestureDetector(
+                                      onTap: () {
+                                        Share.share('Check out this awesome video on ProTube: https://youtu.be/${widget.videoId}');
+                                      },
+                                      child: _buildActionButton(Icons.share, "Share"),
+                                    ),
+                                    GestureDetector(
+                                      onTap: _toggleWatchLater,
+                                      child: _buildActionButton(isSaved ? Icons.bookmark : Icons.bookmark_border, isSaved ? "Saved" : "Save", color: isSaved ? Colors.red : textColor),
+                                    ),
+                                  ],
+                                ),
+                              ],
+                            ),
+                          ),
+                          Divider(color: isDarkMode ? Colors.white24 : Colors.black12, thickness: 1, height: 1),
+                        ],
+                      ),
+                    ),
+
+                    // 🌟 अनलिमिटेड रिलेटेड वीडियोज़ की लिस्ट 🌟
+                    if (isLoading && relatedVideos.isEmpty)
+                      const SliverFillRemaining(
+                        child: Center(child: CircularProgressIndicator(color: Colors.red)),
+                      )
+                    else
+                      SliverList(
+                        delegate: SliverChildBuilderDelegate(
+                          (context, index) {
+                            if (index == relatedVideos.length) {
+                              return const Padding(padding: EdgeInsets.all(20.0), child: Center(child: CircularProgressIndicator(color: Colors.red)));
+                            }
+                            final item = relatedVideos[index];
+                            return _buildRelatedVideoCard(
+                              item['id'], item['title'], item['thumbnail'], 
+                              "${item['author']} • ${_formatViews(item['views'])} views", 
+                              item['durationStr'], item['channelId'], item['channelLogo']
+                            );
+                          },
+                          childCount: relatedVideos.length + (nextPageToken != null ? 1 : 0),
+                        ),
+                      ),
+                  ],
                 ),
+              ),
             ),
           ],
         ),
@@ -288,7 +298,6 @@ class _VideoPlayerScreenState extends State<VideoPlayerScreen> {
   Widget _buildRelatedVideoCard(String videoId, String title, String imageUrl, String subtitleText, String durationText, String channelId, String channelLogoUrl) {
     return GestureDetector(
       onTap: () {
-        // जब किसी रिलेटेड वीडियो पर क्लिक करें, तो प्लेयर को उसी वीडियो के साथ अपडेट कर दो
         Navigator.pushReplacement(context, MaterialPageRoute(builder: (context) => VideoPlayerScreen(videoId: videoId, title: title)));
       },
       child: Padding(
@@ -296,7 +305,6 @@ class _VideoPlayerScreenState extends State<VideoPlayerScreen> {
         child: Row(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            // थंबनेल
             Stack(
               alignment: Alignment.bottomRight,
               children: [
@@ -309,7 +317,6 @@ class _VideoPlayerScreenState extends State<VideoPlayerScreen> {
               ],
             ),
             const SizedBox(width: 12),
-            // टाइटल और डिटेल्स
             Expanded(
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
