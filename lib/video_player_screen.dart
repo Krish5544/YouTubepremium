@@ -27,9 +27,17 @@ class _VideoPlayerScreenState extends State<VideoPlayerScreen> {
   
   bool isSaved = false;
   bool isDarkMode = true;
-  
-  // 🌟 डिस्क्रिप्शन को छोटा-बड़ा करने वाला लॉजिक 🌟
   bool isDescriptionExpanded = false;
+
+  // 🌟 डायनामिक चैनल और वीडियो डिटेल्स 🌟
+  String channelId = '';
+  String channelTitle = 'Loading...';
+  String channelLogoUrl = '';
+  String subscriberCount = '';
+  String videoViews = '';
+  String videoDate = '';
+  String videoDescription = '';
+  bool isSubscribed = false;
 
   Color get bgColor => isDarkMode ? const Color(0xFF0F0F0F) : Colors.white;
   Color get textColor => isDarkMode ? Colors.white : Colors.black;
@@ -50,6 +58,7 @@ class _VideoPlayerScreenState extends State<VideoPlayerScreen> {
       ),
     );
 
+    _fetchVideoDetails(); // 🌟 असली चैनल और डिस्क्रिप्शन डेटा लाने के लिए
     _loadRelatedVideos(isRefresh: true);
   }
 
@@ -60,6 +69,64 @@ class _VideoPlayerScreenState extends State<VideoPlayerScreen> {
         isDarkMode = prefs.getBool('isDarkMode') ?? true;
       });
     }
+  }
+
+  // 🌟 वीडियो, चैनल और डिस्क्रिप्शन का असली डेटा निकालने वाला जादुई फंक्शन 🌟
+  Future<void> _fetchVideoDetails() async {
+    try {
+      var vidRes = await http.get(Uri.parse('https://www.googleapis.com/youtube/v3/videos?part=snippet,statistics&id=${widget.videoId}&key=$apiKey'));
+      var vidData = jsonDecode(vidRes.body);
+      
+      if (vidData['items'] != null && vidData['items'].isNotEmpty) {
+        var snippet = vidData['items'][0]['snippet'];
+        var stats = vidData['items'][0]['statistics'];
+        
+        channelId = snippet['channelId'];
+        channelTitle = snippet['channelTitle'];
+        videoDescription = snippet['description'] ?? '';
+        videoViews = _formatViews(stats['viewCount'] ?? '0');
+        videoDate = _formatDate(snippet['publishedAt']);
+
+        // चैनल का लोगो और सब्सक्राइबर लाने के लिए
+        var chRes = await http.get(Uri.parse('https://www.googleapis.com/youtube/v3/channels?part=snippet,statistics&id=$channelId&key=$apiKey'));
+        var chData = jsonDecode(chRes.body);
+        if (chData['items'] != null && chData['items'].isNotEmpty) {
+          var chSnippet = chData['items'][0]['snippet'];
+          var chStats = chData['items'][0]['statistics'];
+          channelLogoUrl = chSnippet['thumbnails']['default']?['url'] ?? '';
+          subscriberCount = _formatSubscribers(chStats['subscriberCount'] ?? '0');
+        }
+
+        // चेक करो कि यूज़र ने सब्सक्राइब किया है या नहीं
+        final prefs = await SharedPreferences.getInstance();
+        List<String> subChannels = prefs.getStringList('subscribed_channels') ?? [];
+        isSubscribed = subChannels.contains(channelId);
+
+        if (mounted) setState(() {});
+      }
+    } catch (e) {
+      print("Error fetching details: $e");
+    }
+  }
+
+  // 🌟 असली काम करने वाला सब्सक्राइब बटन लॉजिक 🌟
+  Future<void> _toggleSubscribe() async {
+    if (channelId.isEmpty) return;
+    final prefs = await SharedPreferences.getInstance();
+    List<String> subChannels = prefs.getStringList('subscribed_channels') ?? [];
+
+    if (isSubscribed) {
+      subChannels.remove(channelId);
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Unsubscribed from $channelTitle')));
+    } else {
+      if (!subChannels.contains(channelId)) subChannels.add(channelId);
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Subscribed to $channelTitle')));
+    }
+
+    await prefs.setStringList('subscribed_channels', subChannels);
+    setState(() {
+      isSubscribed = !isSubscribed;
+    });
   }
 
   Future<void> _checkIfSaved() async {
@@ -179,6 +246,21 @@ class _VideoPlayerScreenState extends State<VideoPlayerScreen> {
     return views.toString();
   }
 
+  String _formatSubscribers(String countStr) {
+    int count = int.tryParse(countStr) ?? 0;
+    if (count >= 1000000) return '${(count / 1000000).toStringAsFixed(1)}M';
+    if (count >= 1000) return '${(count / 1000).toStringAsFixed(1)}K';
+    return count.toString();
+  }
+
+  String _formatDate(String dateStr) {
+    try {
+      DateTime date = DateTime.parse(dateStr).toLocal();
+      List<String> months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+      return '${date.day} ${months[date.month - 1]} ${date.year}';
+    } catch(e) { return ''; }
+  }
+
   @override
   void dispose() {
     _controller.dispose();
@@ -192,7 +274,7 @@ class _VideoPlayerScreenState extends State<VideoPlayerScreen> {
       body: SafeArea(
         child: Column(
           children: [
-            // 📺 यूट्यूब प्लेयर (हमेशा ऊपर रहेगा)
+            // 📺 यूट्यूब प्लेयर (हमेशा ऊपर फिक्स रहेगा)
             YoutubePlayer(
               controller: _controller,
               showVideoProgressIndicator: true,
@@ -207,7 +289,7 @@ class _VideoPlayerScreenState extends State<VideoPlayerScreen> {
             Expanded(
               child: NotificationListener<ScrollNotification>(
                 onNotification: (ScrollNotification scrollInfo) {
-                  // 🌟 फ़ास्ट लोडिंग (50% वाला लॉजिक जो तुमने बोला था) 🌟
+                  // 🌟 फ़ास्ट लोडिंग (50% वाला अनलिमिटेड वीडियोज़ लॉजिक) 🌟
                   if (!isLoadingMore && scrollInfo.metrics.pixels >= scrollInfo.metrics.maxScrollExtent * 0.5) {
                     _loadRelatedVideos(); 
                   }
@@ -231,38 +313,64 @@ class _VideoPlayerScreenState extends State<VideoPlayerScreen> {
                             ),
                             const SizedBox(height: 12),
                             
-                            // 2. चैनल का नाम और सब्सक्राइब बटन 🌟
+                            // 2. असली चैनल का लोगो, नाम और वर्किंग सब्सक्राइब बटन 🌟
                             Row(
                               children: [
-                                CircleAvatar(
-                                  backgroundColor: isDarkMode ? Colors.grey[800] : Colors.grey[300],
-                                  child: Icon(Icons.person, color: isDarkMode ? Colors.white : Colors.black),
-                                ),
-                                const SizedBox(width: 10),
                                 Expanded(
-                                  child: Column(
-                                    crossAxisAlignment: CrossAxisAlignment.start,
-                                    children: [
-                                      Text("ProTube Channel", style: TextStyle(color: textColor, fontWeight: FontWeight.bold, fontSize: 15)),
-                                      Text("1.2M subscribers", style: TextStyle(color: subTextColor, fontSize: 12)),
-                                    ],
+                                  child: GestureDetector(
+                                    behavior: HitTestBehavior.opaque,
+                                    onTap: () {
+                                      // चैनल खोलने का वर्किंग लिंक
+                                      if (channelId.isNotEmpty) {
+                                        Navigator.push(context, MaterialPageRoute(builder: (c) => ChannelScreen(channelId: channelId)));
+                                      }
+                                    },
+                                    child: Row(
+                                      children: [
+                                        CircleAvatar(
+                                          backgroundColor: isDarkMode ? Colors.grey[800] : Colors.grey[300],
+                                          backgroundImage: channelLogoUrl.isNotEmpty ? NetworkImage(channelLogoUrl) : null,
+                                          child: channelLogoUrl.isEmpty ? Icon(Icons.person, color: isDarkMode ? Colors.white : Colors.black) : null,
+                                        ),
+                                        const SizedBox(width: 10),
+                                        Expanded(
+                                          child: Column(
+                                            crossAxisAlignment: CrossAxisAlignment.start,
+                                            children: [
+                                              Text(channelTitle, style: TextStyle(color: textColor, fontWeight: FontWeight.bold, fontSize: 15), maxLines: 1, overflow: TextOverflow.ellipsis),
+                                              Text(subscriberCount.isNotEmpty ? "$subscriberCount subscribers" : "Loading...", style: TextStyle(color: subTextColor, fontSize: 12)),
+                                            ],
+                                          ),
+                                        ),
+                                      ],
+                                    ),
                                   ),
                                 ),
                                 ElevatedButton(
                                   style: ElevatedButton.styleFrom(
-                                    backgroundColor: isDarkMode ? Colors.white : Colors.black,
-                                    foregroundColor: isDarkMode ? Colors.black : Colors.white,
+                                    backgroundColor: isSubscribed ? (isDarkMode ? Colors.grey[800] : Colors.grey[300]) : (isDarkMode ? Colors.white : Colors.black),
+                                    foregroundColor: isSubscribed ? textColor : (isDarkMode ? Colors.black : Colors.white),
                                     shape: const StadiumBorder(),
-                                    padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8)
+                                    padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                                    elevation: 0,
                                   ),
-                                  onPressed: () {}, // Subscribe Action
-                                  child: const Text("Subscribe", style: TextStyle(fontWeight: FontWeight.bold)),
+                                  onPressed: _toggleSubscribe,
+                                  child: Row(
+                                    mainAxisSize: MainAxisSize.min,
+                                    children: [
+                                      if (isSubscribed) ...[
+                                        Icon(Icons.notifications_active, size: 16, color: textColor),
+                                        const SizedBox(width: 4),
+                                      ],
+                                      Text(isSubscribed ? "Subscribed" : "Subscribe", style: const TextStyle(fontWeight: FontWeight.bold)),
+                                    ],
+                                  ),
                                 )
                               ],
                             ),
                             const SizedBox(height: 16),
                             
-                            // 3. Like, Share, Watch Later (Download) वाले गोल बटन्स 🌟
+                            // 3. Like, Share, Watch Later वाले असली गोल (Pill-shaped) बटन्स 🌟
                             SingleChildScrollView(
                               scrollDirection: Axis.horizontal,
                               child: Row(
@@ -284,7 +392,7 @@ class _VideoPlayerScreenState extends State<VideoPlayerScreen> {
                             ),
                             const SizedBox(height: 16),
 
-                            // 4. ग्रे कलर का डिस्क्रिप्शन बॉक्स (छोटा/बड़ा होने वाला) 🌟
+                            // 4. असली ग्रे कलर का डिस्क्रिप्शन बॉक्स (छोटा/बड़ा होने वाला) 🌟
                             GestureDetector(
                               onTap: () {
                                 setState(() {
@@ -301,15 +409,18 @@ class _VideoPlayerScreenState extends State<VideoPlayerScreen> {
                                 child: Column(
                                   crossAxisAlignment: CrossAxisAlignment.start,
                                   children: [
-                                    Text("64K views  •  2 weeks ago", style: TextStyle(fontWeight: FontWeight.bold, color: textColor, fontSize: 13)),
+                                    Text(
+                                      "${videoViews.isNotEmpty ? videoViews : '...'} views  •  ${videoDate.isNotEmpty ? videoDate : '...'}", 
+                                      style: TextStyle(fontWeight: FontWeight.bold, color: textColor, fontSize: 13)
+                                    ),
                                     const SizedBox(height: 4),
                                     Text(
-                                      "Welcome to this amazing video! Here we discuss the important topics for your exams. Make sure to watch till the end.\n\n#ProTube #Education #Learning #Trending",
+                                      videoDescription.isNotEmpty ? videoDescription : "Loading description...",
                                       maxLines: isDescriptionExpanded ? null : 2,
                                       overflow: isDescriptionExpanded ? TextOverflow.visible : TextOverflow.ellipsis,
                                       style: TextStyle(color: textColor, fontSize: 13),
                                     ),
-                                    if (!isDescriptionExpanded)
+                                    if (!isDescriptionExpanded && videoDescription.isNotEmpty)
                                       Padding(
                                         padding: const EdgeInsets.only(top: 4.0),
                                         child: Text("...more", style: TextStyle(fontWeight: FontWeight.bold, color: textColor)),
@@ -357,7 +468,6 @@ class _VideoPlayerScreenState extends State<VideoPlayerScreen> {
     );
   }
 
-  // 🌟 गोल (Pill-shaped) बटन्स का डिज़ाइन 🌟
   Widget _buildPillButton(IconData icon, String label, {required VoidCallback onTap, bool isActive = false}) {
     return GestureDetector(
       onTap: onTap,
