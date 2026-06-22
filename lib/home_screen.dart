@@ -7,6 +7,7 @@ import 'search_delegate.dart';
 import 'video_player_screen.dart';
 import 'channel_screen.dart';
 import 'playlist_screen.dart';
+import 'music_player_screen.dart'; // 🌟 जादुई लिंक: नया MP3 प्लेयर इम्पोर्ट कर लिया!
 
 class YouTubeHomeScreen extends StatefulWidget {
   const YouTubeHomeScreen({super.key});
@@ -322,9 +323,8 @@ class _YouTubeHomeScreenState extends State<YouTubeHomeScreen> {
 
   @override
   Widget build(BuildContext context) {
-    // 🌟 यहाँ हमने WillPopScope को हटाकर नया और सेफ PopScope लगा दिया है 🌟
     return PopScope(
-      canPop: false, // बैक बटन को सीधा ऐप बंद करने से रोकेगा
+      canPop: false, 
       onPopInvoked: (didPop) {
         if (didPop) return;
         
@@ -338,7 +338,7 @@ class _YouTubeHomeScreenState extends State<YouTubeHomeScreen> {
           _loadResults("UPSSSC Lower PCS classes", isRefresh: true); 
         } 
         else {
-          SystemNavigator.pop(); // अगर सब कुछ होम पर है तो ऐप बंद कर देगा
+          SystemNavigator.pop(); 
         }
       },
       child: Scaffold(
@@ -414,7 +414,6 @@ class _YouTubeHomeScreenState extends State<YouTubeHomeScreen> {
           titleSpacing: 12.0,
           title: Row(
             children: [
-              // 🌟 जादुई बदलाव: लोगो पर क्लिक करने से Music Mode टॉगल होगा 🌟
               GestureDetector(
                 onTap: () {
                   setState(() {
@@ -502,7 +501,6 @@ class _YouTubeHomeScreenState extends State<YouTubeHomeScreen> {
           ],
         ),
         
-        // 🌟 अगर म्यूजिक मोड चालू है तो Spotify जैसा UI दिखेगा, वरना नॉर्मल वीडियो UI 🌟
         body: isMusicMode ? _buildMusicScreen() : _buildBody(),
         
         bottomNavigationBar: BottomNavigationBar(
@@ -514,7 +512,7 @@ class _YouTubeHomeScreenState extends State<YouTubeHomeScreen> {
           onTap: (i) { 
             setState(() {
               _selectedIndex = i;
-              isMusicMode = false; // नीचे टैब क्लिक करते ही म्यूजिक मोड बंद हो जाएगा
+              isMusicMode = false; 
             }); 
             if (i == 1 && _subscriptionsData.isEmpty) _loadSubscriptions(isRefresh: true); 
             if (i == 2) _loadHistory(); 
@@ -647,8 +645,18 @@ class _YouTubeHomeScreenState extends State<YouTubeHomeScreen> {
               final song = _musicData[index];
               return GestureDetector(
                 onTap: () {
-                  // फिलहाल हम इसे नॉर्मल वीडियो प्लेयर में भेज रहे हैं
-                  Navigator.push(context, MaterialPageRoute(builder: (context) => VideoPlayerScreen(videoId: song['id'], title: song['title'])));
+                  // 🌟 MAGIC FIX: अब गाना वीडियो प्लेयर में नहीं, सीधे नए MP3 प्लेयर में खुलेगा! 🌟
+                  Navigator.push(
+                    context, 
+                    MaterialPageRoute(
+                      builder: (context) => MusicPlayerScreen(
+                        videoId: song['id'], 
+                        title: song['title'],
+                        channel: song['channel'],
+                        thumbnail: song['thumbnail'],
+                      )
+                    )
+                  );
                 },
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
