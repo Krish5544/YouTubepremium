@@ -18,6 +18,7 @@ dependencies:
   # 🌟 तुम्हारे कहे अनुसार एकदम लेटेस्ट और मॉडर्न पैकेजेस 🌟
   flutter_volume_controller: ^2.0.1
   screen_brightness: ^2.1.1
+  just_audio: ^0.9.36
 
 dev_dependencies:
   flutter_test:
