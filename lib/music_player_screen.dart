@@ -1,6 +1,5 @@
 import 'package:flutter/material.dart';
-import 'package:just_audio/just_audio.dart';
-import 'package:youtube_explode_dart/youtube_explode_dart.dart' as yt;
+import 'package:youtube_player_flutter/youtube_player_flutter.dart';
 
 class MusicPlayerScreen extends StatefulWidget {
   final String videoId;
@@ -21,62 +20,36 @@ class MusicPlayerScreen extends StatefulWidget {
 }
 
 class _MusicPlayerScreenState extends State<MusicPlayerScreen> {
-  final AudioPlayer _audioPlayer = AudioPlayer();
-  final yt.YoutubeExplode _ytExplode = yt.YoutubeExplode();
-  
-  bool _isLoading = true;
-  String? _errorMessage;
+  late YoutubePlayerController _controller;
+  bool _isPlayerReady = false;
 
   @override
   void initState() {
     super.initState();
-    _initAudio();
-  }
-
-  // 🌟 यूट्यूब से MP4 (AAC) ऑडियो निकालने का जादुई फिक्स 🌟
-  Future<void> _initAudio() async {
-    try {
-      var manifest = await _ytExplode.videos.streamsClient.getManifest(widget.videoId);
-      
-      // 🌟 MAGIC FIX: सिर्फ mp4 कंटेनर वाला ऑडियो ढूंढो जो बिना अटके प्ले होता है
-      var audioStreams = manifest.audioOnly.where((audio) => audio.container.name == 'mp4' || audio.codec.mimeType.contains('mp4'));
-      
-      yt.AudioOnlyStreamInfo audioStream;
-      if (audioStreams.isNotEmpty) {
-        audioStream = audioStreams.withHighestBitrate();
-      } else {
-        audioStream = manifest.audioOnly.withHighestBitrate(); // Fallback
-      }
-      
-      // 🌟 AudioSource.uri का इस्तेमाल ताकि स्ट्रीम क्रैश ना हो
-      await _audioPlayer.setAudioSource(AudioSource.uri(audioStream.url));
-      
-      _audioPlayer.play(); // ऑटोमैटिक गाना चालू
-      
-      if (mounted) {
-        setState(() {
-          _isLoading = false;
-        });
-      }
-    } catch (e) {
-      if (mounted) {
-        setState(() {
-          _isLoading = false;
-          _errorMessage = "ऑडियो लोड नहीं हो पाया। फिर से कोशिश करें।";
-        });
-      }
-    }
+    // 🌟 हमारा पावरफुल प्लेयर जो बैकग्राउंड में काम करेगा 🌟
+    _controller = YoutubePlayerController(
+      initialVideoId: widget.videoId,
+      flags: const YoutubePlayerFlags(
+        autoPlay: true,
+        mute: false,
+        hideControls: true, // यूट्यूब के अपने कंट्रोल्स को छुपा दिया
+        disableDragSeek: true,
+        enableCaption: false,
+        loop: false,
+        isLive: false,
+        forceHD: false,
+      ),
+    );
   }
 
   @override
   void dispose() {
-    _audioPlayer.dispose();
-    _ytExplode.close();
+    _controller.dispose();
     super.dispose();
   }
 
-  String _formatDuration(Duration? duration) {
-    if (duration == null) return "0:00";
+  // टाइमर को सही फॉर्मेट में दिखाने के लिए
+  String _formatDuration(Duration duration) {
     String minutes = duration.inMinutes.toString();
     String seconds = (duration.inSeconds % 60).toString().padLeft(2, '0');
     return "$minutes:$seconds";
@@ -96,162 +69,154 @@ class _MusicPlayerScreenState extends State<MusicPlayerScreen> {
         title: const Text("Pro Music Playing", style: TextStyle(color: Colors.white, fontSize: 14, fontWeight: FontWeight.bold)),
         centerTitle: true,
       ),
-      body: Padding(
-        padding: const EdgeInsets.symmetric(horizontal: 24.0),
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            // 🌟 बड़ा वाला Album Art (थंबनेल)
-            ClipRRect(
-              borderRadius: BorderRadius.circular(16),
-              child: Image.network(
-                widget.thumbnail,
-                height: 320,
-                width: double.infinity,
-                fit: BoxFit.cover,
-                errorBuilder: (c, e, s) => Container(height: 320, color: Colors.grey[900]),
-              ),
+      body: Stack(
+        children: [
+          // 🌟 THE MAGIC (खेड़ा सलूशन): छुपा हुआ वीडियो प्लेयर जो सिर्फ आवाज़ देगा 🌟
+          Offstage(
+            offstage: true, // यह प्लेयर को स्क्रीन से गायब कर देगा, पर गाना बजता रहेगा!
+            child: YoutubePlayer(
+              controller: _controller,
+              onReady: () {
+                setState(() {
+                  _isPlayerReady = true; // जैसे ही रेडी होगा, गोल-गोल घूमना बंद!
+                });
+              },
             ),
-            const SizedBox(height: 40),
-            
-            // 🌟 गाने का टाइटल और चैनल का नाम
-            Align(
-              alignment: Alignment.centerLeft,
-              child: Text(
-                widget.title,
-                style: const TextStyle(color: Colors.white, fontSize: 22, fontWeight: FontWeight.bold),
-                maxLines: 1,
-                overflow: TextOverflow.ellipsis,
-              ),
-            ),
-            const SizedBox(height: 4),
-            Align(
-              alignment: Alignment.centerLeft,
-              child: Text(
-                widget.channel,
-                style: const TextStyle(color: Colors.grey, fontSize: 16),
-                maxLines: 1,
-                overflow: TextOverflow.ellipsis,
-              ),
-            ),
-            const SizedBox(height: 30),
+          ),
 
-            // 🌟 लोडिंग एनीमेशन या प्लेयर के कंट्रोल्स
-            if (_isLoading)
-              const CircularProgressIndicator(color: Colors.greenAccent)
-            else if (_errorMessage != null)
-              Text(_errorMessage!, style: const TextStyle(color: Colors.red))
-            else
-              _buildPlayerControls(),
-          ],
-        ),
+          // 🌟 हमारा प्रीमियम MP3 UI 🌟
+          Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 24.0),
+            child: Column(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                // 1. बड़ा वाला Album Art (थंबनेल)
+                ClipRRect(
+                  borderRadius: BorderRadius.circular(16),
+                  child: Image.network(
+                    widget.thumbnail,
+                    height: 320,
+                    width: double.infinity,
+                    fit: BoxFit.cover,
+                    errorBuilder: (c, e, s) => Container(height: 320, color: Colors.grey[900]),
+                  ),
+                ),
+                const SizedBox(height: 40),
+                
+                // 2. गाने का टाइटल और चैनल का नाम
+                Align(
+                  alignment: Alignment.centerLeft,
+                  child: Text(
+                    widget.title,
+                    style: const TextStyle(color: Colors.white, fontSize: 22, fontWeight: FontWeight.bold),
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                ),
+                const SizedBox(height: 4),
+                Align(
+                  alignment: Alignment.centerLeft,
+                  child: Text(
+                    widget.channel,
+                    style: const TextStyle(color: Colors.grey, fontSize: 16),
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                ),
+                const SizedBox(height: 30),
+
+                // 3. लोडिंग एनीमेशन या प्लेयर के कंट्रोल्स
+                if (!_isPlayerReady)
+                  const CircularProgressIndicator(color: Colors.greenAccent)
+                else
+                  _buildPlayerControls(), // यह हमारा नया और फ़ास्ट कंट्रोलर है
+              ],
+            ),
+          ),
+        ],
       ),
     );
   }
 
-  // 🌟 Play/Pause और सीक बार (Seekbar) का डिज़ाइन 🌟
+  // 🌟 Play/Pause और सीक बार (Seekbar) का नया और मज़बूत डिज़ाइन 🌟
   Widget _buildPlayerControls() {
-    return Column(
-      children: [
-        StreamBuilder<Duration>(
-          stream: _audioPlayer.positionStream,
-          builder: (context, snapshot) {
-            final position = snapshot.data ?? Duration.zero;
-            final duration = _audioPlayer.duration ?? Duration.zero;
+    return ValueListenableBuilder<YoutubePlayerValue>(
+      valueListenable: _controller,
+      builder: (context, value, child) {
+        final position = value.position;
+        final duration = _controller.metadata.duration;
+        final isPlaying = value.isPlaying;
+
+        return Column(
+          children: [
+            // सीक बार (Slider)
+            SliderTheme(
+              data: SliderTheme.of(context).copyWith(
+                trackHeight: 4.0,
+                thumbShape: const RoundSliderThumbShape(enabledThumbRadius: 6.0),
+                overlayShape: const RoundSliderOverlayShape(overlayRadius: 14.0),
+                activeTrackColor: Colors.white,
+                inactiveTrackColor: Colors.grey[800],
+                thumbColor: Colors.white,
+              ),
+              child: Slider(
+                min: 0.0,
+                max: duration.inMilliseconds.toDouble() > 0 ? duration.inMilliseconds.toDouble() : 1.0,
+                value: position.inMilliseconds.toDouble().clamp(0.0, duration.inMilliseconds.toDouble() > 0 ? duration.inMilliseconds.toDouble() : 1.0),
+                onChanged: (val) {
+                  _controller.seekTo(Duration(milliseconds: val.toInt()));
+                },
+              ),
+            ),
             
-            return Column(
+            // टाइमर टेक्स्ट
+            Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
-                SliderTheme(
-                  data: SliderTheme.of(context).copyWith(
-                    trackHeight: 4.0,
-                    thumbShape: const RoundSliderThumbShape(enabledThumbRadius: 6.0),
-                    overlayShape: const RoundSliderOverlayShape(overlayRadius: 14.0),
-                    activeTrackColor: Colors.white,
-                    inactiveTrackColor: Colors.grey[800],
-                    thumbColor: Colors.white,
-                  ),
-                  child: Slider(
-                    min: 0.0,
-                    max: duration.inMilliseconds.toDouble() > 0 ? duration.inMilliseconds.toDouble() : 1.0,
-                    value: position.inMilliseconds.toDouble().clamp(0.0, duration.inMilliseconds.toDouble() > 0 ? duration.inMilliseconds.toDouble() : 1.0),
-                    onChanged: (value) {
-                      _audioPlayer.seek(Duration(milliseconds: value.toInt()));
-                    },
+                Text(_formatDuration(position), style: const TextStyle(color: Colors.grey, fontSize: 12)),
+                Text(_formatDuration(duration), style: const TextStyle(color: Colors.grey, fontSize: 12)),
+              ],
+            ),
+            const SizedBox(height: 10),
+            
+            // Play, Pause, Next, Previous बटन्स
+            Row(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                IconButton(
+                  icon: const Icon(Icons.skip_previous, color: Colors.white, size: 36),
+                  onPressed: () {
+                    _controller.seekTo(Duration.zero); // गाना शुरू से चला देगा
+                  }, 
+                ),
+                const SizedBox(width: 20),
+                
+                // असली जादुई Play/Pause बटन
+                GestureDetector(
+                  onTap: () {
+                    if (isPlaying) {
+                      _controller.pause();
+                    } else {
+                      _controller.play();
+                    }
+                  },
+                  child: Container(
+                    width: 70, height: 70,
+                    decoration: const BoxDecoration(color: Colors.greenAccent, shape: BoxShape.circle),
+                    child: Icon(isPlaying ? Icons.pause : Icons.play_arrow, color: Colors.black, size: 40),
                   ),
                 ),
-                Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                  children: [
-                    Text(_formatDuration(position), style: const TextStyle(color: Colors.grey, fontSize: 12)),
-                    Text(_formatDuration(duration), style: const TextStyle(color: Colors.grey, fontSize: 12)),
-                  ],
+                
+                const SizedBox(width: 20),
+                IconButton(
+                  icon: const Icon(Icons.skip_next, color: Colors.white, size: 36),
+                  onPressed: () {}, // बाद में काम आएगा
                 ),
               ],
-            );
-          },
-        ),
-        const SizedBox(height: 10),
-        
-        Row(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            IconButton(
-              icon: const Icon(Icons.skip_previous, color: Colors.white, size: 36),
-              onPressed: () {}, 
-            ),
-            const SizedBox(width: 20),
-            StreamBuilder<PlayerState>(
-              stream: _audioPlayer.playerStateStream,
-              builder: (context, snapshot) {
-                final playerState = snapshot.data;
-                final processingState = playerState?.processingState;
-                final playing = playerState?.playing;
-
-                if (processingState == ProcessingState.loading || processingState == ProcessingState.buffering) {
-                  return Container(
-                    margin: const EdgeInsets.all(8.0),
-                    width: 64.0,
-                    height: 64.0,
-                    child: const CircularProgressIndicator(color: Colors.greenAccent),
-                  );
-                } else if (playing != true) {
-                  return GestureDetector(
-                    onTap: _audioPlayer.play,
-                    child: Container(
-                      width: 70, height: 70,
-                      decoration: const BoxDecoration(color: Colors.greenAccent, shape: BoxShape.circle),
-                      child: const Icon(Icons.play_arrow, color: Colors.black, size: 40),
-                    ),
-                  );
-                } else if (processingState != ProcessingState.completed) {
-                  return GestureDetector(
-                    onTap: _audioPlayer.pause,
-                    child: Container(
-                      width: 70, height: 70,
-                      decoration: const BoxDecoration(color: Colors.greenAccent, shape: BoxShape.circle),
-                      child: const Icon(Icons.pause, color: Colors.black, size: 40),
-                    ),
-                  );
-                } else {
-                  return GestureDetector(
-                    onTap: () => _audioPlayer.seek(Duration.zero),
-                    child: Container(
-                      width: 70, height: 70,
-                      decoration: const BoxDecoration(color: Colors.greenAccent, shape: BoxShape.circle),
-                      child: const Icon(Icons.replay, color: Colors.black, size: 40),
-                    ),
-                  );
-                }
-              },
-            ),
-            const SizedBox(width: 20),
-            IconButton(
-              icon: const Icon(Icons.skip_next, color: Colors.white, size: 36),
-              onPressed: () {}, 
             ),
           ],
-        ),
-      ],
+        );
+      },
     );
   }
 }
