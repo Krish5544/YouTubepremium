@@ -33,13 +33,24 @@ class _MusicPlayerScreenState extends State<MusicPlayerScreen> {
     _initAudio();
   }
 
-  // 🌟 यूट्यूब से असली MP3 स्ट्रीम निकालने का जादुई लॉजिक 🌟
+  // 🌟 यूट्यूब से MP4 (AAC) ऑडियो निकालने का जादुई फिक्स 🌟
   Future<void> _initAudio() async {
     try {
       var manifest = await _ytExplode.videos.streamsClient.getManifest(widget.videoId);
-      var audioStream = manifest.audioOnly.withHighestBitrate(); // सबसे हाई क्वालिटी MP3
       
-      await _audioPlayer.setUrl(audioStream.url.toString());
+      // 🌟 MAGIC FIX: सिर्फ mp4 कंटेनर वाला ऑडियो ढूंढो जो बिना अटके प्ले होता है
+      var audioStreams = manifest.audioOnly.where((audio) => audio.container.name == 'mp4' || audio.codec.mimeType.contains('mp4'));
+      
+      yt.AudioOnlyStreamInfo audioStream;
+      if (audioStreams.isNotEmpty) {
+        audioStream = audioStreams.withHighestBitrate();
+      } else {
+        audioStream = manifest.audioOnly.withHighestBitrate(); // Fallback
+      }
+      
+      // 🌟 AudioSource.uri का इस्तेमाल ताकि स्ट्रीम क्रैश ना हो
+      await _audioPlayer.setAudioSource(AudioSource.uri(audioStream.url));
+      
       _audioPlayer.play(); // ऑटोमैटिक गाना चालू
       
       if (mounted) {
@@ -51,7 +62,7 @@ class _MusicPlayerScreenState extends State<MusicPlayerScreen> {
       if (mounted) {
         setState(() {
           _isLoading = false;
-          _errorMessage = "ऑडियो लोड करने में एरर आई।";
+          _errorMessage = "ऑडियो लोड नहीं हो पाया। फिर से कोशिश करें।";
         });
       }
     }
@@ -186,7 +197,7 @@ class _MusicPlayerScreenState extends State<MusicPlayerScreen> {
           children: [
             IconButton(
               icon: const Icon(Icons.skip_previous, color: Colors.white, size: 36),
-              onPressed: () {}, // बाद में हम प्लेलिस्ट जोड़ेंगे तब यह काम आएगा
+              onPressed: () {}, 
             ),
             const SizedBox(width: 20),
             StreamBuilder<PlayerState>(
