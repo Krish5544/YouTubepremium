@@ -322,13 +322,24 @@ class _YouTubeHomeScreenState extends State<YouTubeHomeScreen> {
 
   @override
   Widget build(BuildContext context) {
-    return WillPopScope(
-      onWillPop: () async {
-        // 🌟 बैक बटन दबाने पर पहले Music Mode बंद होगा 🌟
-        if (isMusicMode) { setState(() { isMusicMode = false; }); return false; }
-        if (_selectedIndex != 0) { setState(() { _selectedIndex = 0; }); return false; }
-        if (currentQuery != "UPSSSC Lower PCS classes") { _loadResults("UPSSSC Lower PCS classes", isRefresh: true); return false; }
-        return true;
+    // 🌟 यहाँ हमने WillPopScope को हटाकर नया और सेफ PopScope लगा दिया है 🌟
+    return PopScope(
+      canPop: false, // बैक बटन को सीधा ऐप बंद करने से रोकेगा
+      onPopInvoked: (didPop) {
+        if (didPop) return;
+        
+        if (isMusicMode) { 
+          setState(() { isMusicMode = false; }); 
+        } 
+        else if (_selectedIndex != 0) { 
+          setState(() { _selectedIndex = 0; }); 
+        } 
+        else if (currentQuery != "UPSSSC Lower PCS classes") { 
+          _loadResults("UPSSSC Lower PCS classes", isRefresh: true); 
+        } 
+        else {
+          SystemNavigator.pop(); // अगर सब कुछ होम पर है तो ऐप बंद कर देगा
+        }
       },
       child: Scaffold(
         key: _scaffoldKey, 
@@ -416,11 +427,11 @@ class _YouTubeHomeScreenState extends State<YouTubeHomeScreen> {
                     children: isMusicMode
                     ? [
                         TextSpan(text: 'Pro', style: TextStyle(color: textColor)), 
-                        const TextSpan(text: 'Music', style: TextStyle(color: Colors.greenAccent)), // Music Mode हरा चमकेगा
+                        const TextSpan(text: 'Music', style: TextStyle(color: Colors.greenAccent)), 
                       ]
                     : [
                         TextSpan(text: 'Pro', style: TextStyle(color: textColor)), 
-                        const TextSpan(text: 'Tube', style: TextStyle(color: Colors.red)), // Normal Mode लाल रहेगा
+                        const TextSpan(text: 'Tube', style: TextStyle(color: Colors.red)), 
                       ],
                   ),
                 ),
@@ -585,4 +596,126 @@ class _YouTubeHomeScreenState extends State<YouTubeHomeScreen> {
                 itemBuilder: (context, index) { 
                   if (index == _subscriptionsData.length) return const Padding(padding: EdgeInsets.all(20.0), child: Center(child: CircularProgressIndicator(color: Colors.red)));
                   final data = _subscriptionsData[index]; 
-                  return _buildVideoCard(data['id'], data['title'], data['thumbnail'], "${data['author']} • ${_formatViews(data['views']
+                  return _buildVideoCard(data['id'], data['title'], data['thumbnail'], "${data['author']} • ${_formatViews(data['views'])} views • ${_formatExactDate(data['date'])}", data['durationStr'], false, data['channelId'], "");
+                }
+              ),
+            ),
+          ),
+        ],
+      );
+    } 
+    else if (_selectedIndex == 2) {
+      if (_historyData.isEmpty) return Center(child: Column(mainAxisAlignment: MainAxisAlignment.center, children: [Icon(Icons.history, size: 60, color: subTextColor), const SizedBox(height: 10), Text("History is empty", style: TextStyle(color: subTextColor, fontSize: 16))]));
+      return ListView.builder(itemCount: _historyData.length, itemBuilder: (context, index) { final data = _historyData[index]; return _buildVideoCard(data['id'], data['title'], 'https://img.youtube.com/vi/${data['id']}/hqdefault.jpg', "History", _formatDuration(data['position'] ?? 0), true, data['channelId'] ?? '', data['channelLogo'] ?? ''); });
+    } 
+    else if (_selectedIndex == 3) {
+      if (_watchLaterData.isEmpty) return Center(child: Column(mainAxisAlignment: MainAxisAlignment.center, children: [Icon(Icons.watch_later_outlined, size: 60, color: subTextColor), const SizedBox(height: 10), Text("No videos in Watch Later", style: TextStyle(color: subTextColor, fontSize: 16))]));
+      return ListView.builder(itemCount: _watchLaterData.length, itemBuilder: (context, index) { final data = _watchLaterData[index]; return _buildVideoCard(data['id'], data['title'], 'https://img.youtube.com/vi/${data['id']}/hqdefault.jpg', "Saved in Watch Later", "", false, "", ""); });
+    }
+    return Container();
+  }
+
+  // 🌟 Music Mode का एकदम प्रीमियम Spotify जैसा UI 🌟
+  Widget _buildMusicScreen() {
+    if (_isLoadingMusic) return const Center(child: CircularProgressIndicator(color: Colors.greenAccent));
+    if (_musicData.isEmpty) return Center(child: Column(mainAxisAlignment: MainAxisAlignment.center, children: [Icon(Icons.music_off, size: 60, color: subTextColor), const SizedBox(height: 10), Text("No music found", style: TextStyle(color: subTextColor, fontSize: 16))]));
+    
+    return Container(
+      color: isDarkMode ? const Color(0xFF0A0A0A) : Colors.grey[100], 
+      child: ListView(
+        padding: const EdgeInsets.all(16.0),
+        children: [
+          Row(
+            children: [
+              const Icon(Icons.bolt, color: Colors.greenAccent, size: 28),
+              const SizedBox(width: 8),
+              const Text("Top Tracks For You", style: TextStyle(color: Colors.greenAccent, fontSize: 22, fontWeight: FontWeight.bold, letterSpacing: -0.5)),
+            ],
+          ),
+          const SizedBox(height: 20),
+          GridView.builder(
+            shrinkWrap: true,
+            physics: const NeverScrollableScrollPhysics(),
+            gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+              crossAxisCount: 2,
+              crossAxisSpacing: 16,
+              mainAxisSpacing: 16,
+              childAspectRatio: 0.8,
+            ),
+            itemCount: _musicData.length,
+            itemBuilder: (context, index) {
+              final song = _musicData[index];
+              return GestureDetector(
+                onTap: () {
+                  // फिलहाल हम इसे नॉर्मल वीडियो प्लेयर में भेज रहे हैं
+                  Navigator.push(context, MaterialPageRoute(builder: (context) => VideoPlayerScreen(videoId: song['id'], title: song['title'])));
+                },
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Expanded(
+                      child: ClipRRect(
+                        borderRadius: BorderRadius.circular(12),
+                        child: Image.network(song['thumbnail'], width: double.infinity, fit: BoxFit.cover, errorBuilder: (c, e, s) => Container(color: Colors.grey[900])),
+                      ),
+                    ),
+                    const SizedBox(height: 8),
+                    Text(song['title'], style: TextStyle(color: textColor, fontSize: 14, fontWeight: FontWeight.bold), maxLines: 1, overflow: TextOverflow.ellipsis),
+                    Text(song['channel'], style: TextStyle(color: subTextColor, fontSize: 12), maxLines: 1, overflow: TextOverflow.ellipsis),
+                  ],
+                ),
+              );
+            },
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildVideoCard(String videoId, String title, String imageUrl, String subtitleText, String durationText, bool isHistory, String channelId, String channelLogoUrl) {
+    return GestureDetector(
+      onTap: () => Navigator.push(context, MaterialPageRoute(builder: (context) => VideoPlayerScreen(videoId: videoId, title: title))).then((_) { 
+        if (_selectedIndex == 1) _loadSubscriptions(isRefresh: true);
+        if (_selectedIndex == 2) _loadHistory(); 
+        if (_selectedIndex == 3) _loadWatchLater();
+      }),
+      child: Padding(
+        padding: const EdgeInsets.only(bottom: 15.0), 
+        child: Column(
+          children: [
+            Stack(
+              alignment: Alignment.bottomRight, 
+              children: [
+                Image.network(imageUrl, height: 220, width: double.infinity, fit: BoxFit.cover, errorBuilder: (c, e, s) => Container(height: 220, color: isDarkMode ? Colors.grey[900] : Colors.grey[300])), 
+                if (durationText.isNotEmpty) 
+                  Container(margin: const EdgeInsets.all(8), padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 2), color: Colors.black.withOpacity(0.8), child: Text(durationText, style: const TextStyle(color: Colors.white, fontSize: 12)))
+              ]
+            ), 
+            Padding(
+              padding: const EdgeInsets.fromLTRB(12, 12, 12, 0), 
+              child: Row(
+                children: [
+                  GestureDetector(
+                    onTap: () { if (channelId.isNotEmpty) Navigator.push(context, MaterialPageRoute(builder: (c) => ChannelScreen(channelId: channelId))); }, 
+                    child: CircleAvatar(backgroundColor: isDarkMode ? Colors.grey[800] : Colors.grey[300], backgroundImage: channelLogoUrl.isNotEmpty ? NetworkImage(channelLogoUrl) : null, child: channelLogoUrl.isEmpty ? const Icon(Icons.person, color: Colors.white) : null)
+                  ), 
+                  const SizedBox(width: 12), 
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start, 
+                      children: [
+                        Text(title, style: TextStyle(color: textColor, fontSize: 15), maxLines: 2, overflow: TextOverflow.ellipsis), 
+                        const SizedBox(height: 4), 
+                        Text(isHistory ? "आपने $durationText तक देखा" : subtitleText, style: TextStyle(color: subTextColor, fontSize: 12))
+                      ]
+                    )
+                  )
+                ]
+              )
+            )
+          ]
+        )
+      ),
+    );
+  }
+}
