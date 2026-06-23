@@ -33,30 +33,24 @@ class _MusicPlayerScreenState extends State<MusicPlayerScreen> {
     _initAudio();
   }
 
-  // 🌟 100% PURE EXPLODE AUDIO FETCHER 🌟
+  // 🌟 100% PURE EXPLODE AUDIO FETCHER (No Headers, No Tricks) 🌟
   Future<void> _initAudio() async {
     try {
+      // 1. YouTube से गाने का डेटा निकालो
       var manifest = await _ytExplode.videos.streamsClient.getManifest(widget.videoId);
       
-      // 🌟 Android (just_audio) के लिए सबसे बेस्ट फॉर्मेट MP4/M4A होता है, WebM अटकता है
-      var audioStreams = manifest.audioOnly.where((a) => a.codec.mimeType.contains('mp4') || a.codec.mimeType.contains('m4a'));
-      
+      // 2. Android के लिए सबसे बेस्ट MP4 ऑडियो ढूंढो
       yt.AudioOnlyStreamInfo audioStream;
-      if (audioStreams.isNotEmpty) {
-        audioStream = audioStreams.withHighestBitrate();
+      var mp4Streams = manifest.audioOnly.where((a) => a.codec.mimeType.contains('mp4') || a.container.name == 'mp4');
+      
+      if (mp4Streams.isNotEmpty) {
+        audioStream = mp4Streams.first; // सबसे स्टेबल MP4 फॉर्मेट
       } else {
-        audioStream = manifest.audioOnly.withHighestBitrate();
+        audioStream = manifest.audioOnly.withHighestBitrate(); // अगर MP4 ना मिले तो बेस्ट क्वालिटी
       }
 
-      // 🌟 YouTube Server को बायपास करने के लिए Browser Headers (ताकि ब्लॉक ना हो) 🌟
-      final headers = {
-        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
-        'Accept': '*/*',
-      };
-
-      await _audioPlayer.setAudioSource(
-        AudioSource.uri(audioStream.url, headers: headers),
-      );
+      // 3. बिना किसी Custom Header के डायरेक्ट URL प्ले करो
+      await _audioPlayer.setUrl(audioStream.url.toString());
       
       _audioPlayer.play();
       
@@ -66,10 +60,12 @@ class _MusicPlayerScreenState extends State<MusicPlayerScreen> {
         });
       }
     } catch (e) {
+      print("Real Audio Error: $e"); // कंसोल में एरर प्रिंट होगी
       if (mounted) {
         setState(() {
           _isLoading = false;
-          _errorMessage = "Loading Failed! Please try again.";
+          // 🌟 MAGIC FIX: अब तुम्हें स्क्रीन पर असली एरर दिखेगी! 🌟
+          _errorMessage = "Error: $e"; 
         });
       }
     }
@@ -144,7 +140,8 @@ class _MusicPlayerScreenState extends State<MusicPlayerScreen> {
             if (_isLoading)
               const CircularProgressIndicator(color: Colors.greenAccent)
             else if (_errorMessage != null)
-              Text(_errorMessage!, style: const TextStyle(color: Colors.red))
+              // 🌟 असली एरर यहाँ प्रिंट होगी 🌟
+              Text(_errorMessage!, style: const TextStyle(color: Colors.red, fontSize: 12), textAlign: TextAlign.center)
             else
               _buildPlayerControls(),
           ],
