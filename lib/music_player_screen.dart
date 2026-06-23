@@ -33,36 +33,32 @@ class _MusicPlayerScreenState extends State<MusicPlayerScreen> {
     _initAudio();
   }
 
-  // 🌟 EXPERT MP3 EXTRACTION SYSTEM 🌟
+  // 🌟 100% PURE EXPLODE AUDIO FETCHER 🌟
   Future<void> _initAudio() async {
     try {
-      // 1. YouTube से गाने का असली डेटा निकालो
       var manifest = await _ytExplode.videos.streamsClient.getManifest(widget.videoId);
       
-      // 2. सिर्फ M4A/MP4 ऑडियो ढूँढो (जो Android पर बिना अटके सबसे तेज़ चलता है)
+      // 🌟 Android (just_audio) के लिए सबसे बेस्ट फॉर्मेट MP4/M4A होता है, WebM अटकता है
       var audioStreams = manifest.audioOnly.where((a) => a.codec.mimeType.contains('mp4') || a.codec.mimeType.contains('m4a'));
       
       yt.AudioOnlyStreamInfo audioStream;
       if (audioStreams.isNotEmpty) {
         audioStream = audioStreams.withHighestBitrate();
       } else {
-        audioStream = manifest.audioOnly.withHighestBitrate(); // Fallback
+        audioStream = manifest.audioOnly.withHighestBitrate();
       }
 
-      // 🌟 THE MASTER BYPASS: YouTube को लगेगा कि यह असली ब्राउज़र है 🌟
+      // 🌟 YouTube Server को बायपास करने के लिए Browser Headers (ताकि ब्लॉक ना हो) 🌟
       final headers = {
-        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/114.0.0.0 Safari/537.36',
+        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+        'Accept': '*/*',
       };
 
-      // 3. Audio Player को MP3 लिंक दे दो
       await _audioPlayer.setAudioSource(
-        AudioSource.uri(
-          audioStream.url,
-          headers: headers, // यह हेडर लगाने से लोडिंग पर नहीं अटकेगा!
-        ),
+        AudioSource.uri(audioStream.url, headers: headers),
       );
       
-      _audioPlayer.play(); // गाना ऑटोमैटिक चालू
+      _audioPlayer.play();
       
       if (mounted) {
         setState(() {
@@ -73,7 +69,7 @@ class _MusicPlayerScreenState extends State<MusicPlayerScreen> {
       if (mounted) {
         setState(() {
           _isLoading = false;
-          _errorMessage = "MP3 लोड नहीं हो पाया। सर्वर एरर।";
+          _errorMessage = "Loading Failed! Please try again.";
         });
       }
     }
@@ -96,7 +92,7 @@ class _MusicPlayerScreenState extends State<MusicPlayerScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: const Color(0xFF0A0A0A), // Spotify Dark Theme
+      backgroundColor: const Color(0xFF0A0A0A),
       appBar: AppBar(
         backgroundColor: Colors.transparent,
         elevation: 0,
@@ -112,7 +108,6 @@ class _MusicPlayerScreenState extends State<MusicPlayerScreen> {
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            // 🌟 बड़ा वाला Album Art (थंबनेल)
             ClipRRect(
               borderRadius: BorderRadius.circular(16),
               child: Image.network(
@@ -125,7 +120,6 @@ class _MusicPlayerScreenState extends State<MusicPlayerScreen> {
             ),
             const SizedBox(height: 40),
             
-            // 🌟 गाने का टाइटल और चैनल का नाम
             Align(
               alignment: Alignment.centerLeft,
               child: Text(
@@ -147,7 +141,6 @@ class _MusicPlayerScreenState extends State<MusicPlayerScreen> {
             ),
             const SizedBox(height: 30),
 
-            // 🌟 लोडिंग एनीमेशन या प्लेयर के कंट्रोल्स
             if (_isLoading)
               const CircularProgressIndicator(color: Colors.greenAccent)
             else if (_errorMessage != null)
@@ -160,7 +153,6 @@ class _MusicPlayerScreenState extends State<MusicPlayerScreen> {
     );
   }
 
-  // 🌟 असली MP3 Play/Pause और सीक बार (Seekbar) 🌟
   Widget _buildPlayerControls() {
     return Column(
       children: [
@@ -212,7 +204,6 @@ class _MusicPlayerScreenState extends State<MusicPlayerScreen> {
             ),
             const SizedBox(width: 20),
             
-            // 🌟 State-based Play/Pause Button (अब आइकन पक्का दिखेगा!) 🌟
             StreamBuilder<PlayerState>(
               stream: _audioPlayer.playerStateStream,
               builder: (context, snapshot) {
