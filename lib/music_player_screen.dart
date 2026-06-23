@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:just_audio/just_audio.dart';
 import 'package:youtube_explode_dart/youtube_explode_dart.dart' as yt;
+import 'package:http/http.dart' as http;
 
 class MusicPlayerScreen extends StatefulWidget {
   final String videoId;
@@ -33,25 +34,25 @@ class _MusicPlayerScreenState extends State<MusicPlayerScreen> {
     _initAudio();
   }
 
-  // 🌟 100% PURE EXPLODE AUDIO FETCHER (No Headers, No Tricks) 🌟
+  // 🌟 THE GOD-LEVEL FIX: ExoPlayer को बायपास करने का लॉजिक 🌟
   Future<void> _initAudio() async {
     try {
-      // 1. YouTube से गाने का डेटा निकालो
       var manifest = await _ytExplode.videos.streamsClient.getManifest(widget.videoId);
       
-      // 2. Android के लिए सबसे बेस्ट MP4 ऑडियो ढूंढो
-      yt.AudioOnlyStreamInfo audioStream;
-      var mp4Streams = manifest.audioOnly.where((a) => a.codec.mimeType.contains('mp4') || a.container.name == 'mp4');
+      var audioStreams = manifest.audioOnly;
+      yt.AudioOnlyStreamInfo? audioStream;
       
-      if (mp4Streams.isNotEmpty) {
-        audioStream = mp4Streams.first; // सबसे स्टेबल MP4 फॉर्मेट
-      } else {
-        audioStream = manifest.audioOnly.withHighestBitrate(); // अगर MP4 ना मिले तो बेस्ट क्वालिटी
+      try {
+        // सबसे स्टेबल MP4 फॉर्मेट ढूँढना
+        audioStream = audioStreams.firstWhere((a) => a.codec.mimeType.contains('mp4') || a.codec.mimeType.contains('m4a'));
+      } catch (_) {
+        audioStream = audioStreams.withHighestBitrate();
       }
 
-      // 3. बिना किसी Custom Header के डायरेक्ट URL प्ले करो
-      await _audioPlayer.setUrl(audioStream.url.toString());
+      // 🌟 जादू यहाँ है: हम URL सीधा प्लेयर को नहीं दे रहे, बल्कि Custom Proxy Source को दे रहे हैं
+      final source = YoutubeAudioSource(audioStream.url.toString());
       
+      await _audioPlayer.setAudioSource(source);
       _audioPlayer.play();
       
       if (mounted) {
@@ -60,11 +61,9 @@ class _MusicPlayerScreenState extends State<MusicPlayerScreen> {
         });
       }
     } catch (e) {
-      print("Real Audio Error: $e"); // कंसोल में एरर प्रिंट होगी
       if (mounted) {
         setState(() {
           _isLoading = false;
-          // 🌟 MAGIC FIX: अब तुम्हें स्क्रीन पर असली एरर दिखेगी! 🌟
           _errorMessage = "Error: $e"; 
         });
       }
@@ -140,7 +139,6 @@ class _MusicPlayerScreenState extends State<MusicPlayerScreen> {
             if (_isLoading)
               const CircularProgressIndicator(color: Colors.greenAccent)
             else if (_errorMessage != null)
-              // 🌟 असली एरर यहाँ प्रिंट होगी 🌟
               Text(_errorMessage!, style: const TextStyle(color: Colors.red, fontSize: 12), textAlign: TextAlign.center)
             else
               _buildPlayerControls(),
@@ -254,6 +252,46 @@ class _MusicPlayerScreenState extends State<MusicPlayerScreen> {
           ],
         ),
       ],
+    );
+  }
+}
+
+// 🌟 THE MASTER PROXY SOURCE (यह YouTube को चकमा देकर सीधा गाना उठाएगा) 🌟
+class YoutubeAudioSource extends StreamAudioSource {
+  final String url;
+  YoutubeAudioSource(this.url);
+
+  @override
+  Future<StreamAudioResponse> request([int? start, int? end]) async {
+    start ??= 0;
+    
+    // एकदम स्टैंडर्ड ब्राउज़र हेडर्स जो ब्लॉक नहीं होते
+    final headers = {
+      'Range': 'bytes=$start-${end ?? ''}',
+      'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+    };
+
+    var request = http.Request('GET', Uri.parse(url));
+    request.headers.addAll(headers);
+    
+    var response = await http.Client().send(request);
+
+    if (response.statusCode >= 400) {
+      throw Exception("YouTube Server Blocked Request: ${response.statusCode}");
+    }
+
+    int? sourceLength;
+    String? contentRange = response.headers['content-range'];
+    if (contentRange != null && contentRange.contains('/')) {
+      sourceLength = int.tryParse(contentRange.split('/').last);
+    }
+
+    return StreamAudioResponse(
+      sourceLength: sourceLength,
+      contentLength: response.contentLength,
+      offset: start,
+      stream: response.stream,
+      contentType: response.headers['content-type'] ?? 'audio/mp4',
     );
   }
 }
