@@ -1,7 +1,10 @@
 import 'package:flutter/material.dart';
 import 'home_screen.dart'; 
 
-void main() {
+void main() async {
+  // 🌟 MAGIC FIX: यह लाइन पूरे ऐप के इंजन को स्टार्ट कर देगी जिससे लोडिंग नहीं अटकेगी! 🌟
+  WidgetsFlutterBinding.ensureInitialized(); 
+  
   runApp(const MyApp());
 }
 
