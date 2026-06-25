@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
-import 'package:youtube_player_flutter/youtube_player_flutter.dart';
+import 'package:youtube_player_iframe/youtube_player_iframe.dart';
 
 class VideoPlayerScreen extends StatefulWidget {
   final String videoId;
@@ -22,45 +22,37 @@ class _VideoPlayerScreenState extends State<VideoPlayerScreen> {
   @override
   void initState() {
     super.initState();
-    // 🌟 THE OFFICIAL VIDEO PLAYER (No Custom UI) 🌟
-    _controller = YoutubePlayerController(
-      initialVideoId: widget.videoId,
-      flags: const YoutubePlayerFlags(
-        autoPlay: true,
+    // 🌟 THE 100% REAL YOUTUBE WEB PLAYER (Vidsave जैसा) 🌟
+    _controller = YoutubePlayerController.fromVideoId(
+      videoId: widget.videoId,
+      autoPlay: true,
+      params: const YoutubePlayerParams(
+        showControls: true, // 🌟 असली कंट्रोल्स 🌟
+        showFullscreenButton: true, // 🌟 असली फुलस्क्रीन बटन 🌟
         mute: false,
-        hideControls: false, // 🌟 ओरिजिनल YouTube कंट्रोल्स चालू 🌟
-        disableDragSeek: false, // स्लाइडर खींचने की आज़ादी
-        enableCaption: false,
+        enableCaption: true, // 🌟 Subtitles (CC) का ऑप्शन 🌟
         loop: false,
-        isLive: false,
-        forceHD: true,
       ),
     );
   }
 
   @override
   void dispose() {
-    _controller.dispose();
+    _controller.close();
     SystemChrome.setPreferredOrientations([DeviceOrientation.portraitUp]);
     super.dispose();
   }
 
   @override
   Widget build(BuildContext context) {
-    return YoutubePlayerBuilder(
-      player: YoutubePlayer(
-        controller: _controller,
-        showVideoProgressIndicator: true,
-        progressIndicatorColor: Colors.red,
-        progressColors: const ProgressBarColors(
-          playedColor: Colors.red,
-          handleColor: Colors.white,
-        ),
-      ),
+    // 🌟 YoutubePlayerScaffold फुलस्क्रीन को अच्छे से हैंडल करता है 🌟
+    return YoutubePlayerScaffold(
+      controller: _controller,
       builder: (context, player) {
         return Scaffold(
-          backgroundColor: const Color(0xFF0F0F0F),
-          // फुलस्क्रीन में AppBar छुप जाएगा
+          backgroundColor: const Color(0xFF0F0F0F), // Premium Black Theme
+          
+          // जब वीडियो फुलस्क्रीन में होगी, तो AppBar अपने आप छुप जाएगा
           appBar: MediaQuery.of(context).orientation == Orientation.landscape 
             ? null 
             : AppBar(
@@ -72,9 +64,10 @@ class _VideoPlayerScreenState extends State<VideoPlayerScreen> {
                 ),
                 title: const Text("ProTube Video", style: TextStyle(color: Colors.white, fontSize: 16)),
               ),
+              
           body: Column(
             children: [
-              // 🌟 यहाँ तुम्हारा वीडियो वाला असली प्लेयर दिखेगा 🌟
+              // 🌟 यहाँ तुम्हारा Vidsave वेबसाइट वाला हूबहू असली प्लेयर दिखेगा 🌟
               player,
               
               if (MediaQuery.of(context).orientation == Orientation.portrait) ...[
