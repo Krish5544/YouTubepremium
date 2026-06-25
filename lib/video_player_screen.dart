@@ -22,15 +22,15 @@ class _VideoPlayerScreenState extends State<VideoPlayerScreen> {
   @override
   void initState() {
     super.initState();
-    // 🌟 THE 100% REAL YOUTUBE WEB PLAYER (Vidsave जैसा) 🌟
+    // 🌟 THE 100% REAL YOUTUBE WEB PLAYER (बिना किसी बदलाव के) 🌟
     _controller = YoutubePlayerController.fromVideoId(
       videoId: widget.videoId,
       autoPlay: true,
       params: const YoutubePlayerParams(
-        showControls: true, // 🌟 असली कंट्रोल्स 🌟
-        showFullscreenButton: true, // 🌟 असली फुलस्क्रीन बटन 🌟
+        showControls: true, 
+        showFullscreenButton: true, 
         mute: false,
-        enableCaption: true, // 🌟 Subtitles (CC) का ऑप्शन 🌟
+        enableCaption: true, 
         loop: false,
       ),
     );
@@ -39,51 +39,56 @@ class _VideoPlayerScreenState extends State<VideoPlayerScreen> {
   @override
   void dispose() {
     _controller.close();
+    // 🌟 स्क्रीन से बैक आने पर फोन को वापस सीधा करने के लिए 🌟
     SystemChrome.setPreferredOrientations([DeviceOrientation.portraitUp]);
     super.dispose();
   }
 
   @override
   Widget build(BuildContext context) {
-    // 🌟 YoutubePlayerScaffold फुलस्क्रीन को अच्छे से हैंडल करता है 🌟
+    // 🌟 YoutubePlayerScaffold फुलस्क्रीन को एकदम स्मूथली हैंडल करता है 🌟
     return YoutubePlayerScaffold(
       controller: _controller,
       builder: (context, player) {
         return Scaffold(
           backgroundColor: const Color(0xFF0F0F0F), // Premium Black Theme
           
-          // जब वीडियो फुलस्क्रीन में होगी, तो AppBar अपने आप छुप जाएगा
-          appBar: MediaQuery.of(context).orientation == Orientation.landscape 
-            ? null 
-            : AppBar(
-                backgroundColor: Colors.transparent,
-                elevation: 0,
-                leading: IconButton(
-                  icon: const Icon(Icons.arrow_back, color: Colors.white),
-                  onPressed: () => Navigator.pop(context),
-                ),
-                title: const Text("ProTube Video", style: TextStyle(color: Colors.white, fontSize: 16)),
-              ),
+          // 🌟 MAGIC FIX: हमने यहाँ से MediaQuery वाला कोड हटा दिया है। 
+          // अब पैकेज खुद ही फुलस्क्रीन को मक्खन की तरह हैंडल करेगा! 🌟
+          appBar: AppBar(
+            backgroundColor: Colors.transparent,
+            elevation: 0,
+            leading: IconButton(
+              icon: const Icon(Icons.arrow_back, color: Colors.white),
+              onPressed: () => Navigator.pop(context),
+            ),
+            title: const Text("ProTube Video", style: TextStyle(color: Colors.white, fontSize: 16)),
+          ),
               
           body: Column(
             children: [
               // 🌟 यहाँ तुम्हारा Vidsave वेबसाइट वाला हूबहू असली प्लेयर दिखेगा 🌟
               player,
               
-              if (MediaQuery.of(context).orientation == Orientation.portrait) ...[
-                Padding(
-                  padding: const EdgeInsets.all(16.0),
-                  child: Align(
-                    alignment: Alignment.centerLeft,
-                    child: Text(
-                      widget.title,
-                      style: const TextStyle(color: Colors.white, fontSize: 18, fontWeight: FontWeight.bold),
-                      maxLines: 2,
-                      overflow: TextOverflow.ellipsis,
+              // 🌟 वीडियो के नीचे का हिस्सा (टाइटल) 🌟
+              Expanded(
+                child: SingleChildScrollView(
+                  child: Padding(
+                    padding: const EdgeInsets.all(16.0),
+                    child: Align(
+                      alignment: Alignment.centerLeft,
+                      child: Text(
+                        widget.title,
+                        style: const TextStyle(
+                          color: Colors.white, 
+                          fontSize: 18, 
+                          fontWeight: FontWeight.bold
+                        ),
+                      ),
                     ),
                   ),
                 ),
-              ]
+              ),
             ],
           ),
         );
