@@ -10,8 +10,11 @@ dependencies:
   flutter:
     sdk: flutter
     
-  # 🌟 THE MAGIC FIX: GitHub के कहे अनुसार लेटेस्ट वर्ज़न कर दिया है 🌟
+  # 🌟 वीडियो प्लेयर के लिए नया पैकेज (Vidsave जैसा) 🌟
   youtube_player_iframe: ^6.0.2
+  
+  # 🌟 म्यूज़िक प्लेयर के लिए पुराना पैकेज (ताकि एरर ना आए) 🌟
+  youtube_player_flutter: ^9.0.0
   
   youtube_explode_dart: ^2.2.3
   shared_preferences: ^2.2.3 
