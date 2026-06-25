@@ -9,13 +9,15 @@ environment:
 dependencies:
   flutter:
     sdk: flutter
-  youtube_player_flutter: ^9.0.0
+    
+  # 🌟 THE NEW OFFICIAL YOUTUBE WEB PLAYER 🌟
+  youtube_player_iframe: ^3.1.2
+  
+  # 🌟 तुम्हारे प्रोजेक्ट के बाकी सभी जरूरी पैकेजेस 🌟
   youtube_explode_dart: ^2.2.3
   shared_preferences: ^2.2.3 
   http: ^1.2.0
   share_plus: ^7.2.2
-  
-  # 🌟 तुम्हारे कहे अनुसार एकदम लेटेस्ट और मॉडर्न पैकेजेस 🌟
   flutter_volume_controller: ^2.0.1
   screen_brightness: ^2.1.1
   just_audio: ^0.9.36
@@ -23,3 +25,7 @@ dependencies:
 dev_dependencies:
   flutter_test:
     sdk: flutter
+  flutter_lints: ^2.0.0
+
+flutter:
+  uses-material-design: true
