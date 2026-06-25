@@ -10,10 +10,9 @@ dependencies:
   flutter:
     sdk: flutter
     
-  # 🌟 THE NEW OFFICIAL YOUTUBE WEB PLAYER 🌟
-  youtube_player_iframe: ^3.1.2
+  # 🌟 THE MAGIC FIX: GitHub के कहे अनुसार लेटेस्ट वर्ज़न कर दिया है 🌟
+  youtube_player_iframe: ^6.0.2
   
-  # 🌟 तुम्हारे प्रोजेक्ट के बाकी सभी जरूरी पैकेजेस 🌟
   youtube_explode_dart: ^2.2.3
   shared_preferences: ^2.2.3 
   http: ^1.2.0
