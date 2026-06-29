@@ -21,6 +21,7 @@ class _YouTubeHomeScreenState extends State<YouTubeHomeScreen> {
   final GlobalKey<ScaffoldState> _scaffoldKey = GlobalKey<ScaffoldState>();
   
   int _selectedIndex = 0;
+  // तुम्हारी बंद की हुई API Key (इसे हम अगले स्टेप में पूरी तरह हटा देंगे)
   final String apiKey = 'AIzaSyBpPAohs_WhlCTiozmCVMEzrGsRE86LgpU';
   
   List<Map<String, dynamic>> searchResults = [];
@@ -29,25 +30,23 @@ class _YouTubeHomeScreenState extends State<YouTubeHomeScreen> {
   String? nextPageToken;
   String currentQuery = "UPSSSC Lower PCS classes";
   
-  // 🌟 Error Handling Variable 🌟
   String homeErrorMessage = '';
-  
   List<Map<String, dynamic>> _historyData = [];
   List<Map<String, dynamic>> _watchLaterData = [];
   
   List<Map<String, dynamic>> _subscriptionsData = [];
-  List<Map<String, dynamic>> _subscribedChannelsDetails = []; 
+  List<Map<String, dynamic>> _subscribedChannelsDetails = [];
   bool _isLoadingSubscriptions = false;
   bool _isLoadingMoreSubs = false;
   Map<String, String> _subPageTokens = {}; 
   bool _hasMoreSubs = true;
-
+  
   List<Map<String, dynamic>> _musicData = [];
   bool _isLoadingMusic = false;
 
   final MethodChannel _platform = const MethodChannel('com.protube_app/voice');
 
-  bool isDarkMode = true; 
+  bool isDarkMode = true;
   bool isMusicMode = false; 
 
   Color get bgColor => isDarkMode ? const Color(0xFF0F0F0F) : Colors.white;
@@ -62,7 +61,6 @@ class _YouTubeHomeScreenState extends State<YouTubeHomeScreen> {
     _initializeApp();
   }
 
-  // 🌟 सब कुछ एक साथ सेफ तरीके से स्टार्ट करने का फंक्शन 🌟
   Future<void> _initializeApp() async {
     await _loadTheme();
     _loadResults(currentQuery, isRefresh: true);
@@ -107,7 +105,6 @@ class _YouTubeHomeScreenState extends State<YouTubeHomeScreen> {
     }
   }
 
-  // 🌟 ANTI-HANG API LOADER (Timeout Added) 🌟
   Future<void> _loadResults(String query, {bool isRefresh = false}) async {
     if (isRefresh) {
       setState(() { isLoading = true; searchResults.clear(); nextPageToken = null; currentQuery = query; homeErrorMessage = ''; });
@@ -120,22 +117,18 @@ class _YouTubeHomeScreenState extends State<YouTubeHomeScreen> {
       String url = 'https://www.googleapis.com/youtube/v3/search?part=snippet&maxResults=20&q=$currentQuery&key=$apiKey';
       if (nextPageToken != null) url += '&pageToken=$nextPageToken';
 
-      // 10 सेकंड का टाइमआउट ताकि ऐप कभी हैंग ना हो
       var res = await http.get(Uri.parse(url)).timeout(const Duration(seconds: 10));
-      
-      if (res.statusCode == 403) {
-        if (mounted) setState(() { isLoading = false; isLoadingMore = false; homeErrorMessage = "⚠️ YouTube API Quota Exceeded!"; });
+      if (res.statusCode == 403 || res.statusCode == 400) {
+        if (mounted) setState(() { isLoading = false; isLoadingMore = false; homeErrorMessage = "⚠️ API Key बंद है! कोई वीडियो नहीं दिखेगी।"; });
         return;
       }
 
       var data = jsonDecode(res.body);
       nextPageToken = data['nextPageToken'];
       List items = data['items'] ?? [];
-      
       if (items.isNotEmpty) {
         List<Map<String, dynamic>> newResults = [];
         List<String> videoIds = [];
-        
         for (var item in items) {
           String kind = item['id']['kind'];
           if (kind == 'youtube#channel') {
@@ -170,9 +163,11 @@ class _YouTubeHomeScreenState extends State<YouTubeHomeScreen> {
           }
         }
         if (mounted) setState(() { searchResults.addAll(newResults); isLoading = false; isLoadingMore = false; });
-      } else { if (mounted) setState(() { isLoading = false; isLoadingMore = false; }); }
+      } else { 
+        if (mounted) setState(() { isLoading = false; isLoadingMore = false; });
+      }
     } catch (e) { 
-      if (mounted) setState(() { isLoading = false; isLoadingMore = false; homeErrorMessage = "Network Timeout! कृपया इंटरनेट चेक करें।"; }); 
+      if (mounted) setState(() { isLoading = false; isLoadingMore = false; homeErrorMessage = "Network Timeout! कृपया इंटरनेट चेक करें।"; });
     }
   }
 
@@ -181,15 +176,13 @@ class _YouTubeHomeScreenState extends State<YouTubeHomeScreen> {
     try {
       String url = 'https://www.googleapis.com/youtube/v3/search?part=snippet&maxResults=20&q=latest+trending+songs&type=video&videoCategoryId=10&key=$apiKey';
       var res = await http.get(Uri.parse(url)).timeout(const Duration(seconds: 10));
-      
-      if (res.statusCode == 403) {
+      if (res.statusCode == 403 || res.statusCode == 400) {
         if (mounted) setState(() => _isLoadingMusic = false);
         return;
       }
 
       var data = jsonDecode(res.body);
       List items = data['items'] ?? [];
-      
       List<Map<String, dynamic>> newMusic = [];
       for (var item in items) {
          if(item['id']['videoId'] != null) {
@@ -225,7 +218,7 @@ class _YouTubeHomeScreenState extends State<YouTubeHomeScreen> {
 
   Future<void> _loadSubscriptions({bool isRefresh = false}) async {
     if (isRefresh) {
-      _subPageTokens.clear(); 
+      _subPageTokens.clear();
       if (mounted) setState(() { _isLoadingSubscriptions = true; _subscriptionsData.clear(); _subscribedChannelsDetails.clear(); _hasMoreSubs = true; });
     } else {
       if (_isLoadingMoreSubs || !_hasMoreSubs) return;
@@ -241,8 +234,7 @@ class _YouTubeHomeScreenState extends State<YouTubeHomeScreen> {
         return;
       }
 
-      var topChannels = subChannels.take(10).toList(); 
-
+      var topChannels = subChannels.take(10).toList();
       if (isRefresh) {
         var channelRes = await http.get(Uri.parse('https://www.googleapis.com/youtube/v3/channels?part=snippet&id=${topChannels.join(',')}&key=$apiKey')).timeout(const Duration(seconds: 10));
         if (channelRes.statusCode == 200) {
@@ -453,15 +445,15 @@ class _YouTubeHomeScreenState extends State<YouTubeHomeScreen> {
                   text: TextSpan(
                     style: const TextStyle(fontSize: 22, fontWeight: FontWeight.bold, letterSpacing: -0.5),
                     children: isMusicMode
-                    ? [
+                     ? [
                         TextSpan(text: 'Pro', style: TextStyle(color: textColor)), 
                         const TextSpan(text: 'Music', style: TextStyle(color: Colors.greenAccent)), 
                       ]
-                    : [
+                     : [
                         TextSpan(text: 'Pro', style: TextStyle(color: textColor)), 
                         const TextSpan(text: 'Tube', style: TextStyle(color: Colors.red)), 
                       ],
-                  ),
+                   ),
                 ),
               ),
               const SizedBox(width: 16),
@@ -498,14 +490,14 @@ class _YouTubeHomeScreenState extends State<YouTubeHomeScreen> {
                                   colors: [Colors.blue, Colors.redAccent, Colors.yellow, Colors.green],
                                   begin: Alignment.topLeft,
                                   end: Alignment.bottomRight,
-                                ).createShader(bounds);
+                                 ).createShader(bounds);
                               },
                               child: const Icon(Icons.mic, size: 20, color: Colors.white),
-                            ),
+                             ),
                           ),
                         ),
                       ],
-                    ),
+                     ),
                   ),
                 ),
               ),
@@ -531,6 +523,24 @@ class _YouTubeHomeScreenState extends State<YouTubeHomeScreen> {
         ),
         
         body: isMusicMode ? _buildMusicScreen() : _buildBody(),
+
+        // 🌟 यह रहा तुम्हारा NATIVE PLAYER TEST BUTTON 🌟
+        floatingActionButton: FloatingActionButton.extended(
+          onPressed: () {
+            Navigator.push(
+              context,
+              MaterialPageRoute(
+                builder: (context) => const VideoPlayerScreen(
+                  videoId: "dummy",
+                  title: "Native Player Big Buck Bunny Test",
+                ),
+              ),
+            );
+          },
+          label: const Text("Test Player", style: TextStyle(color: Colors.black, fontWeight: FontWeight.bold)),
+          icon: const Icon(Icons.play_arrow, color: Colors.black),
+          backgroundColor: Colors.greenAccent,
+        ),
         
         bottomNavigationBar: BottomNavigationBar(
           backgroundColor: bgColor, 
@@ -561,8 +571,6 @@ class _YouTubeHomeScreenState extends State<YouTubeHomeScreen> {
   Widget _buildBody() {
     if (_selectedIndex == 0) {
       if (isLoading) return const Center(child: CircularProgressIndicator(color: Colors.red));
-      
-      // 🌟 ERROR UI 🌟
       if (homeErrorMessage.isNotEmpty) {
         return Center(
           child: Padding(
@@ -657,7 +665,7 @@ class _YouTubeHomeScreenState extends State<YouTubeHomeScreen> {
     } 
     else if (_selectedIndex == 2) {
       if (_historyData.isEmpty) return Center(child: Column(mainAxisAlignment: MainAxisAlignment.center, children: [Icon(Icons.history, size: 60, color: subTextColor), const SizedBox(height: 10), Text("History is empty", style: TextStyle(color: subTextColor, fontSize: 16))]));
-      return ListView.builder(itemCount: _historyData.length, itemBuilder: (context, index) { final data = _historyData[index]; return _buildVideoCard(data['id'], data['title'], 'https://img.youtube.com/vi/${data['id']}/hqdefault.jpg', "History", _formatDuration(data['position'] ?? 0), true, data['channelId'] ?? '', data['channelLogo'] ?? ''); });
+      return ListView.builder(itemCount: _historyData.length, itemBuilder: (context, index) { final data = _historyData[index]; return _buildVideoCard(data['id'], data['title'], 'https://img.youtube.com/vi/${data['id']}/hqdefault.jpg', "History", _formatDuration(data['position'] ?? 0.0), true, data['channelId'] ?? '', data['channelLogo'] ?? ''); });
     } 
     else if (_selectedIndex == 3) {
       if (_watchLaterData.isEmpty) return Center(child: Column(mainAxisAlignment: MainAxisAlignment.center, children: [Icon(Icons.watch_later_outlined, size: 60, color: subTextColor), const SizedBox(height: 10), Text("No videos in Watch Later", style: TextStyle(color: subTextColor, fontSize: 16))]));
@@ -669,7 +677,6 @@ class _YouTubeHomeScreenState extends State<YouTubeHomeScreen> {
   Widget _buildMusicScreen() {
     if (_isLoadingMusic) return const Center(child: CircularProgressIndicator(color: Colors.greenAccent));
     if (_musicData.isEmpty) return Center(child: Column(mainAxisAlignment: MainAxisAlignment.center, children: [Icon(Icons.music_off, size: 60, color: subTextColor), const SizedBox(height: 10), Text("No music found", style: TextStyle(color: subTextColor, fontSize: 16))]));
-    
     return Container(
       color: isDarkMode ? const Color(0xFF0A0A0A) : Colors.grey[100], 
       child: ListView(
