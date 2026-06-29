@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:youtube_explode_dart/youtube_explode_dart.dart';
 import 'native_player_bridge.dart';
 
 class VideoPlayerScreen extends StatefulWidget {
@@ -17,21 +18,49 @@ class VideoPlayerScreen extends StatefulWidget {
 }
 
 class _VideoPlayerScreenState extends State<VideoPlayerScreen> {
+  // 🌟 THE DECODER: YouTube API का बाप 🌟
+  final YoutubeExplode _yt = YoutubeExplode();
+  
+  bool _isLoading = true;
+  String _errorMessage = '';
+
   @override
   void initState() {
     super.initState();
-    // 🌟 जैसे ही स्क्रीन खुलेगी, हम Native Android को वीडियो प्ले करने का सिग्नल भेजेंगे 🌟
-    _startNativePlayer();
+    _extractAndPlayVideo();
   }
 
-  Future<void> _startNativePlayer() async {
-    // हमारा ब्रिज Android को वीडियो की ID भेजेगा
-    await NativePlayerBridge.playVideo(widget.videoId);
+  // 🚀 यह फंक्शन YouTube से असली MP4 लिंक निकालेगा
+  Future<void> _extractAndPlayVideo() async {
+    try {
+      // 1. YouTube से वीडियो का 'कच्चा चिट्ठा' (Manifest) मंगाना
+      var manifest = await _yt.videos.streamsClient.getManifest(widget.videoId);
+      
+      // 2. सबसे अच्छी क्वालिटी वाला वीडियो+ऑडियो (Muxed) स्ट्रीम चुनना
+      var streamInfo = manifest.muxedStreams.withHighestBitrate();
+      var realMp4Url = streamInfo.url.toString();
+
+      // 3. इस असली MP4 लिंक को हमारे Android ExoPlayer को भेज देना
+      await NativePlayerBridge.playVideo(realMp4Url);
+      
+      if (mounted) {
+        setState(() {
+          _isLoading = false; // लोडिंग खत्म, प्लेयर रेडी!
+        });
+      }
+    } catch (e) {
+      if (mounted) {
+        setState(() {
+          _isLoading = false;
+          _errorMessage = "वीडियो लिंक नहीं मिल पाया! Error: $e";
+        });
+      }
+    }
   }
 
   @override
   void dispose() {
-    // 🌟 स्क्रीन से बैक आने पर फोन को वापस सीधा करने के लिए 🌟
+    _yt.close(); // मेमोरी बचाने के लिए डिकोडर बंद करना
     SystemChrome.setPreferredOrientations([DeviceOrientation.portraitUp]);
     super.dispose();
   }
@@ -54,13 +83,19 @@ class _VideoPlayerScreenState extends State<VideoPlayerScreen> {
       body: Column(
         children: [
           // 🌟 THE REAL NATIVE ENGINE (AndroidView) 🌟
-          // यह वो जगह है जहाँ Android अपना असली ExoPlayer रेंडर करेगा!
-          const AspectRatio(
+          AspectRatio(
             aspectRatio: 16 / 9,
-            child: AndroidView(
-              viewType: 'native-player-view',
-              creationParamsCodec: StandardMessageCodec(),
-            ),
+            child: _isLoading 
+                ? const Center(child: CircularProgressIndicator(color: Colors.red))
+                : _errorMessage.isNotEmpty
+                    ? Center(child: Padding(
+                        padding: const EdgeInsets.all(16.0),
+                        child: Text(_errorMessage, style: const TextStyle(color: Colors.white), textAlign: TextAlign.center),
+                      ))
+                    : const AndroidView(
+                        viewType: 'native-player-view',
+                        creationParamsCodec: StandardMessageCodec(),
+                      ),
           ),
           
           // 🌟 वीडियो के नीचे का हिस्सा (टाइटल) 🌟
