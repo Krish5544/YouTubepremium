@@ -1,5 +1,5 @@
 name: protube_app
-description: A new Flutter project.
+description: "ProTube Zero - Native Power"
 publish_to: 'none'
 version: 1.0.0+1
 
@@ -9,20 +9,8 @@ environment:
 dependencies:
   flutter:
     sdk: flutter
-    
-  # 🌟 वीडियो प्लेयर के लिए नया पैकेज (Vidsave जैसा) 🌟
-  youtube_player_iframe: ^6.0.2
-  
-  # 🌟 म्यूज़िक प्लेयर के लिए पुराना पैकेज (ताकि एरर ना आए) 🌟
-  youtube_player_flutter: ^9.0.0
-  
-  youtube_explode_dart: ^2.2.3
-  shared_preferences: ^2.2.3 
   http: ^1.2.0
-  share_plus: ^7.2.2
-  flutter_volume_controller: ^2.0.1
-  screen_brightness: ^2.1.1
-  just_audio: ^0.9.36
+  shared_preferences: ^2.2.3
 
 dev_dependencies:
   flutter_test:
