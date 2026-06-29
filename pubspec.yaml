@@ -11,6 +11,8 @@ dependencies:
     sdk: flutter
   http: ^1.2.0
   shared_preferences: ^2.2.3
+  # 🌟 THE DECODER: YouTube API का बाप 🌟
+  youtube_explode_dart: ^2.2.3
 
 dev_dependencies:
   flutter_test:
