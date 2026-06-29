@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
-import 'package:youtube_player_iframe/youtube_player_iframe.dart';
+import 'native_player_bridge.dart';
 
 class VideoPlayerScreen extends StatefulWidget {
   final String videoId;
@@ -17,28 +17,20 @@ class VideoPlayerScreen extends StatefulWidget {
 }
 
 class _VideoPlayerScreenState extends State<VideoPlayerScreen> {
-  late YoutubePlayerController _controller;
-
   @override
   void initState() {
     super.initState();
-    // 🌟 THE 100% REAL YOUTUBE WEB PLAYER (बिना किसी बदलाव के) 🌟
-    _controller = YoutubePlayerController.fromVideoId(
-      videoId: widget.videoId,
-      autoPlay: true,
-      params: const YoutubePlayerParams(
-        showControls: true, 
-        showFullscreenButton: true, 
-        mute: false,
-        enableCaption: true, 
-        loop: false,
-      ),
-    );
+    // 🌟 जैसे ही स्क्रीन खुलेगी, हम Native Android को वीडियो प्ले करने का सिग्नल भेजेंगे 🌟
+    _startNativePlayer();
+  }
+
+  Future<void> _startNativePlayer() async {
+    // हमारा ब्रिज Android को वीडियो की ID भेजेगा
+    await NativePlayerBridge.playVideo(widget.videoId);
   }
 
   @override
   void dispose() {
-    _controller.close();
     // 🌟 स्क्रीन से बैक आने पर फोन को वापस सीधा करने के लिए 🌟
     SystemChrome.setPreferredOrientations([DeviceOrientation.portraitUp]);
     super.dispose();
@@ -46,53 +38,52 @@ class _VideoPlayerScreenState extends State<VideoPlayerScreen> {
 
   @override
   Widget build(BuildContext context) {
-    // 🌟 YoutubePlayerScaffold फुलस्क्रीन को एकदम स्मूथली हैंडल करता है 🌟
-    return YoutubePlayerScaffold(
-      controller: _controller,
-      builder: (context, player) {
-        return Scaffold(
-          backgroundColor: const Color(0xFF0F0F0F), // Premium Black Theme
+    return Scaffold(
+      backgroundColor: const Color(0xFF0F0F0F), // Premium Black Theme
+      
+      appBar: AppBar(
+        backgroundColor: Colors.transparent,
+        elevation: 0,
+        leading: IconButton(
+          icon: const Icon(Icons.arrow_back, color: Colors.white),
+          onPressed: () => Navigator.pop(context),
+        ),
+        title: const Text("ProTube Native", style: TextStyle(color: Colors.white, fontSize: 16)),
+      ),
           
-          // 🌟 MAGIC FIX: हमने यहाँ से MediaQuery वाला कोड हटा दिया है। 
-          // अब पैकेज खुद ही फुलस्क्रीन को मक्खन की तरह हैंडल करेगा! 🌟
-          appBar: AppBar(
-            backgroundColor: Colors.transparent,
-            elevation: 0,
-            leading: IconButton(
-              icon: const Icon(Icons.arrow_back, color: Colors.white),
-              onPressed: () => Navigator.pop(context),
+      body: Column(
+        children: [
+          // 🌟 THE REAL NATIVE ENGINE (AndroidView) 🌟
+          // यह वो जगह है जहाँ Android अपना असली ExoPlayer रेंडर करेगा!
+          const AspectRatio(
+            aspectRatio: 16 / 9,
+            child: AndroidView(
+              viewType: 'native-player-view',
+              creationParamsCodec: StandardMessageCodec(),
             ),
-            title: const Text("ProTube Video", style: TextStyle(color: Colors.white, fontSize: 16)),
           ),
-              
-          body: Column(
-            children: [
-              // 🌟 यहाँ तुम्हारा Vidsave वेबसाइट वाला हूबहू असली प्लेयर दिखेगा 🌟
-              player,
-              
-              // 🌟 वीडियो के नीचे का हिस्सा (टाइटल) 🌟
-              Expanded(
-                child: SingleChildScrollView(
-                  child: Padding(
-                    padding: const EdgeInsets.all(16.0),
-                    child: Align(
-                      alignment: Alignment.centerLeft,
-                      child: Text(
-                        widget.title,
-                        style: const TextStyle(
-                          color: Colors.white, 
-                          fontSize: 18, 
-                          fontWeight: FontWeight.bold
-                        ),
-                      ),
+          
+          // 🌟 वीडियो के नीचे का हिस्सा (टाइटल) 🌟
+          Expanded(
+            child: SingleChildScrollView(
+              child: Padding(
+                padding: const EdgeInsets.all(16.0),
+                child: Align(
+                  alignment: Alignment.centerLeft,
+                  child: Text(
+                    widget.title,
+                    style: const TextStyle(
+                      color: Colors.white, 
+                      fontSize: 18, 
+                      fontWeight: FontWeight.bold
                     ),
                   ),
                 ),
               ),
-            ],
+            ),
           ),
-        );
-      },
+        ],
+      ),
     );
   }
 }
