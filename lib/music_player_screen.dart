@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
-import 'package:youtube_player_flutter/youtube_player_flutter.dart';
+import 'package:flutter/services.dart';
+import 'native_player_bridge.dart';
 
 class MusicPlayerScreen extends StatefulWidget {
   final String videoId;
@@ -20,48 +21,32 @@ class MusicPlayerScreen extends StatefulWidget {
 }
 
 class _MusicPlayerScreenState extends State<MusicPlayerScreen> {
-  late YoutubePlayerController _controller;
-  bool _isPlayerReady = false;
+  bool _isPlaying = true;
+  double _currentPosition = 0; // 🌟 (अभी के लिए डमी टाइमर)
+  double _totalDuration = 100;
 
   @override
   void initState() {
     super.initState();
-    // 🌟 THE GHOST ENGINE: यह 100% असली गाना प्ले करेगा बिना ब्लॉक हुए 🌟
-    _controller = YoutubePlayerController(
-      initialVideoId: widget.videoId,
-      flags: const YoutubePlayerFlags(
-        autoPlay: true,
-        mute: false,
-        hideControls: true, // इसके अपने कंट्रोल्स को हमने मार दिया है
-        disableDragSeek: true,
-        enableCaption: false,
-        loop: false,
-        isLive: false,
-        forceHD: false,
-      ),
-    )..addListener(_listener);
+    // 🌟 THE GHOST ENGINE: नेटिव ऑडियो प्लेयर को बैकग्राउंड में शुरू करना 🌟
+    _startNativeAudio();
   }
 
-  // 🌟 यह लिसनर हमारे कस्टम UI को एकदम रियल-टाइम में अपडेट करेगा 🌟
-  void _listener() {
-    if (_controller.value.isReady && !_isPlayerReady) {
-      if (mounted) setState(() => _isPlayerReady = true);
-    }
-    // स्लाइडर और बटन्स को हर सेकंड अपडेट करने के लिए
-    if (mounted) setState(() {}); 
+  Future<void> _startNativeAudio() async {
+    await NativePlayerBridge.playVideo(widget.videoId);
   }
 
   @override
   void dispose() {
-    _controller.removeListener(_listener);
-    _controller.dispose();
+    // 🌟 प्लेयर को रोकने का कोड हम नेटिव ब्रिज में जोड़ेंगे
     super.dispose();
   }
 
-  String _formatDuration(Duration duration) {
-    String minutes = duration.inMinutes.toString();
-    String seconds = (duration.inSeconds % 60).toString().padLeft(2, '0');
-    return "$minutes:$seconds";
+  String _formatDuration(double seconds) {
+    final duration = Duration(seconds: seconds.toInt());
+    String mins = duration.inMinutes.toString();
+    String secs = (duration.inSeconds % 60).toString().padLeft(2, '0');
+    return "$mins:$secs";
   }
 
   @override
@@ -71,14 +56,15 @@ class _MusicPlayerScreenState extends State<MusicPlayerScreen> {
       
       body: Stack(
         children: [
-          // 🌟 THE 1x1 PIXEL ENGINE (यह किसी को नहीं दिखेगा) 🌟
-          Positioned(
+          // 🌟 THE 1x1 PIXEL ENGINE (यह किसी को नहीं दिखेगा पर गाना बजाएगा) 🌟
+          const Positioned(
             top: 0,
             left: 0,
             width: 1, 
             height: 1,
-            child: YoutubePlayer(
-              controller: _controller,
+            child: AndroidView(
+              viewType: 'native-player-view',
+              creationParamsCodec: StandardMessageCodec(),
             ),
           ),
 
@@ -159,11 +145,8 @@ class _MusicPlayerScreenState extends State<MusicPlayerScreen> {
                         ),
                         const SizedBox(height: 35),
 
-                        // 🌟 Loading or The Player Controls 🌟
-                        if (!_isPlayerReady)
-                          const CircularProgressIndicator(color: Colors.greenAccent)
-                        else
-                          _buildPlayerControls(),
+                        // 🌟 Player Controls 🌟
+                        _buildPlayerControls(),
                       ],
                     ),
                   ),
@@ -178,10 +161,6 @@ class _MusicPlayerScreenState extends State<MusicPlayerScreen> {
 
   // 🌟 THE PERFECT SPOTIFY-LIKE CONTROLS 🌟
   Widget _buildPlayerControls() {
-    final position = _controller.value.position;
-    final duration = _controller.metadata.duration;
-    final isPlaying = _controller.value.isPlaying;
-
     return Column(
       children: [
         // 🌟 Premium Seekbar (Slider) 🌟
@@ -190,18 +169,20 @@ class _MusicPlayerScreenState extends State<MusicPlayerScreen> {
             trackHeight: 4.0,
             thumbShape: const RoundSliderThumbShape(enabledThumbRadius: 7.0),
             overlayShape: const RoundSliderOverlayShape(overlayRadius: 20.0),
-            activeTrackColor: Colors.greenAccent, // Spotify Green Feel
+            activeTrackColor: Colors.greenAccent, 
             inactiveTrackColor: Colors.white24,
             thumbColor: Colors.greenAccent,
-            overlayColor: Colors.greenAccent.withOpacity(0.2), // टच करने पर इफ़ेक्ट
+            overlayColor: Colors.greenAccent.withOpacity(0.2), 
           ),
           child: Slider(
             min: 0.0,
-            max: duration.inMilliseconds.toDouble() > 0 ? duration.inMilliseconds.toDouble() : 1.0,
-            value: position.inMilliseconds.toDouble().clamp(0.0, duration.inMilliseconds.toDouble() > 0 ? duration.inMilliseconds.toDouble() : 1.0),
+            max: _totalDuration > 0 ? _totalDuration : 1.0,
+            value: _currentPosition.clamp(0.0, _totalDuration > 0 ? _totalDuration : 1.0),
             onChanged: (val) {
-              // स्लाइडर खींचने पर तुरंत गाना वहीं से बजेगा
-              _controller.seekTo(Duration(milliseconds: val.toInt()));
+              setState(() {
+                _currentPosition = val;
+              });
+              // 🌟 यहाँ हम बाद में Native Player को Seek करने का कमांड जोड़ेंगे 🌟
             },
           ),
         ),
@@ -210,8 +191,8 @@ class _MusicPlayerScreenState extends State<MusicPlayerScreen> {
         Row(
           mainAxisAlignment: MainAxisAlignment.spaceBetween,
           children: [
-            Text(_formatDuration(position), style: TextStyle(color: Colors.grey[400], fontSize: 13, fontWeight: FontWeight.w500)),
-            Text(_formatDuration(duration), style: TextStyle(color: Colors.grey[400], fontSize: 13, fontWeight: FontWeight.w500)),
+            Text(_formatDuration(_currentPosition), style: TextStyle(color: Colors.grey[400], fontSize: 13, fontWeight: FontWeight.w500)),
+            Text(_formatDuration(_totalDuration), style: TextStyle(color: Colors.grey[400], fontSize: 13, fontWeight: FontWeight.w500)),
           ],
         ),
         const SizedBox(height: 15),
@@ -224,23 +205,19 @@ class _MusicPlayerScreenState extends State<MusicPlayerScreen> {
             // ⏪ 10 सेकंड पीछे जाने का बटन
             IconButton(
               icon: const Icon(Icons.replay_10, color: Colors.white, size: 32),
-              onPressed: () {
-                final newPosition = position - const Duration(seconds: 10);
-                _controller.seekTo(newPosition < Duration.zero ? Duration.zero : newPosition);
-              }, 
+              onPressed: () {}, 
             ),
             
             // ⏯️ Premium Play/Pause Button
             Material(
               color: Colors.transparent,
               child: InkWell(
-                borderRadius: BorderRadius.circular(50), // टच करने पर गोल इफ़ेक्ट
+                borderRadius: BorderRadius.circular(50), 
                 onTap: () {
-                  if (isPlaying) {
-                    _controller.pause();
-                  } else {
-                    _controller.play();
-                  }
+                  setState(() {
+                    _isPlaying = !_isPlaying;
+                  });
+                  // 🌟 यहाँ हम बाद में Play/Pause का Native कमांड जोड़ेंगे 🌟
                 },
                 child: Container(
                   width: 75, 
@@ -250,7 +227,7 @@ class _MusicPlayerScreenState extends State<MusicPlayerScreen> {
                     shape: BoxShape.circle,
                   ),
                   child: Icon(
-                    isPlaying ? Icons.pause : Icons.play_arrow, 
+                    _isPlaying ? Icons.pause : Icons.play_arrow, 
                     color: Colors.black, 
                     size: 45
                   ),
@@ -261,10 +238,7 @@ class _MusicPlayerScreenState extends State<MusicPlayerScreen> {
             // ⏩ 10 सेकंड आगे जाने का बटन
             IconButton(
               icon: const Icon(Icons.forward_10, color: Colors.white, size: 32),
-              onPressed: () {
-                final newPosition = position + const Duration(seconds: 10);
-                _controller.seekTo(newPosition > duration ? duration : newPosition);
-              }, 
+              onPressed: () {}, 
             ),
           ],
         ),
