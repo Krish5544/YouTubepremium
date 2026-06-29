@@ -1,3 +1,10 @@
+// 🌟 सख़्त नियम: plugins ब्लॉक हमेशा सबसे ऊपर होना चाहिए 🌟
+plugins {
+    id "com.android.application"
+    id "kotlin-android"
+    id "dev.flutter.flutter-gradle-plugin"
+}
+
 def localProperties = new Properties()
 def localPropertiesFile = rootProject.file("local.properties")
 if (localPropertiesFile.exists()) {
@@ -14,13 +21,6 @@ if (flutterVersionCode == null) {
 def flutterVersionName = localProperties.getProperty("flutter.versionName")
 if (flutterVersionName == null) {
     flutterVersionName = "1.0"
-}
-
-// 🌟 यह है नया Declarative तरीका जो GitHub Actions मांग रहा है 🌟
-plugins {
-    id "com.android.application"
-    id "kotlin-android"
-    id "dev.flutter.flutter-gradle-plugin"
 }
 
 android {
