@@ -21,7 +21,7 @@ class _YouTubeHomeScreenState extends State<YouTubeHomeScreen> {
   final GlobalKey<ScaffoldState> _scaffoldKey = GlobalKey<ScaffoldState>();
   
   int _selectedIndex = 0;
-  // तुम्हारी बंद की हुई API Key (इसे हम अगले स्टेप में पूरी तरह हटा देंगे)
+  // 🌟 API Key (Ise hum agli step mein puri tarah hata denge)
   final String apiKey = 'AIzaSyBpPAohs_WhlCTiozmCVMEzrGsRE86LgpU';
   
   List<Map<String, dynamic>> searchResults = [];
@@ -336,8 +336,8 @@ class _YouTubeHomeScreenState extends State<YouTubeHomeScreen> {
 
   String _formatViews(String viewsStr) {
     int views = int.tryParse(viewsStr) ?? 0;
-    if (views >= 10000000) return '${(views / 10000000).toStringAsFixed(1)} करोड़';
-    if (views >= 100000) return '${(views / 100000).toStringAsFixed(1)} लाख';
+    if (views >= 10000000) return '${(views / 10000000).toStringAsFixed(1)} crore';
+    if (views >= 100000) return '${(views / 100000).toStringAsFixed(1)} lakh';
     if (views >= 1000) return '${(views / 1000).toStringAsFixed(1)}K';
     return views.toString();
   }
@@ -524,15 +524,15 @@ class _YouTubeHomeScreenState extends State<YouTubeHomeScreen> {
         
         body: isMusicMode ? _buildMusicScreen() : _buildBody(),
 
-        // 🌟 यह रहा तुम्हारा NATIVE PLAYER TEST BUTTON 🌟
+        // 🌟 MAGIC FIX: Yeh raha tumhara NATIVE PLAYER TEST BUTTON asli YouTube ID ke sath 🌟
         floatingActionButton: FloatingActionButton.extended(
           onPressed: () {
             Navigator.push(
               context,
               MaterialPageRoute(
                 builder: (context) => const VideoPlayerScreen(
-                  videoId: "dummy",
-                  title: "Native Player Big Buck Bunny Test",
+                  videoId: "aqz-KE-bpKQ", 
+                  title: "Native Player Real Video Test",
                 ),
               ),
             );
@@ -772,7 +772,7 @@ class _YouTubeHomeScreenState extends State<YouTubeHomeScreen> {
                       children: [
                         Text(title, style: TextStyle(color: textColor, fontSize: 15), maxLines: 2, overflow: TextOverflow.ellipsis), 
                         const SizedBox(height: 4), 
-                        Text(isHistory ? "आपने $durationText तक देखा" : subtitleText, style: TextStyle(color: subTextColor, fontSize: 12))
+                        Text(isHistory ? "Aapne $durationText tak dekha" : subtitleText, style: TextStyle(color: subTextColor, fontSize: 12))
                       ]
                     )
                   )
