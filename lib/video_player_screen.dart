@@ -36,8 +36,8 @@ class _VideoPlayerScreenState extends State<VideoPlayerScreen> {
       // 1. YouTube से वीडियो का 'कच्चा चिट्ठा' (Manifest) मंगाना
       var manifest = await _yt.videos.streamsClient.getManifest(widget.videoId);
       
-      // 2. सबसे अच्छी क्वालिटी वाला वीडियो+ऑडियो (Muxed) स्ट्रीम चुनना
-      var streamInfo = manifest.muxedStreams.withHighestBitrate();
+      // 🌟 MAGIC FIX: यहाँ muxedStreams की जगह 'muxed' और 'withHighestVideoQuality()' का इस्तेमाल होगा 🌟
+      var streamInfo = manifest.muxed.withHighestVideoQuality();
       var realMp4Url = streamInfo.url.toString();
 
       // 3. इस असली MP4 लिंक को हमारे Android ExoPlayer को भेज देना
