@@ -14,16 +14,15 @@ import io.flutter.plugin.platform.PlatformViewFactory
 import com.google.android.exoplayer2.ExoPlayer
 import com.google.android.exoplayer2.MediaItem
 import com.google.android.exoplayer2.ui.StyledPlayerView
+import com.google.android.exoplayer2.upstream.DefaultHttpDataSource
+import com.google.android.exoplayer2.source.DefaultMediaSourceFactory
 import java.util.Locale
 
 class MainActivity: FlutterActivity() {
-    // 🌟 तुम्हारा पुराना वॉयस चैनल
     private val VOICE_CHANNEL = "com.protube_app/voice"
-    // 🌟 हमारा नया वीडियो प्लेयर चैनल
     private val PLAYER_CHANNEL = "com.protube.zero/player"
     private var pendingResult: MethodChannel.Result? = null
 
-    // प्लेयर को कंट्रोल करने के लिए ग्लोबल रेफरेंस
     companion object {
         var activePlayer: ExoPlayer? = null
     }
@@ -31,13 +30,11 @@ class MainActivity: FlutterActivity() {
     override fun configureFlutterEngine(flutterEngine: FlutterEngine) {
         super.configureFlutterEngine(flutterEngine)
 
-        // 1. ExoPlayer का Native View रजिस्टर करना (ताकि Flutter इसे देख सके)
         flutterEngine.platformViewsController.registry.registerViewFactory(
             "native-player-view",
             NativePlayerFactory()
         )
 
-        // 2. तुम्हारा पुराना Voice Search वाला लॉजिक (बिल्कुल सेफ)
         MethodChannel(flutterEngine.dartExecutor.binaryMessenger, VOICE_CHANNEL).setMethodCallHandler { call, result ->
             if (call.method == "startVoiceSearch") {
                 pendingResult = result
@@ -56,14 +53,11 @@ class MainActivity: FlutterActivity() {
             }
         }
 
-        // 3. हमारा नया Native Player कंट्रोलर (अब असली URL पकड़ेगा!)
         MethodChannel(flutterEngine.dartExecutor.binaryMessenger, PLAYER_CHANNEL).setMethodCallHandler { call, result ->
             if (call.method == "playVideo") {
-                // 🌟 Flutter (video_player_screen.dart) से भेजा गया असली MP4 लिंक निकालना 🌟
                 val url = call.argument<String>("url")
                 
                 if (activePlayer != null && url != null) {
-                    // 🚀 असली YouTube वीडियो स्ट्रीम को ExoPlayer में लोड करना
                     val mediaItem = MediaItem.fromUri(url)
                     activePlayer?.setMediaItem(mediaItem)
                     activePlayer?.prepare()
@@ -101,15 +95,22 @@ class NativePlayerView(context: Context) : PlatformView {
     private val playerView: StyledPlayerView = StyledPlayerView(context)
 
     init {
-        // प्लेयर बनाना और उसे स्क्रीन (UI) से जोड़ना
-        MainActivity.activePlayer = ExoPlayer.Builder(context).build()
+        // 🌟 MAGIC FIX: YouTube Server Bypass (User-Agent Spoofing) 🌟
+        // यह कोड YouTube को बेवकूफ बनाएगा कि रिक्वेस्ट किसी Android ExoPlayer से नहीं, 
+        // बल्कि एक असली Windows/Chrome ब्राउज़र से आ रही है।
+        val dataSourceFactory = DefaultHttpDataSource.Factory()
+            .setUserAgent("Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36")
+
+        MainActivity.activePlayer = ExoPlayer.Builder(context)
+            .setMediaSourceFactory(DefaultMediaSourceFactory(dataSourceFactory))
+            .build()
+            
         playerView.player = MainActivity.activePlayer
     }
 
     override fun getView(): View = playerView
 
     override fun dispose() {
-        // मेमोरी लीक से बचने के लिए प्लेयर बंद करना
         MainActivity.activePlayer?.release()
         MainActivity.activePlayer = null
     }
