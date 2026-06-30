@@ -56,21 +56,21 @@ class MainActivity: FlutterActivity() {
             }
         }
 
-        // 3. हमारा नया Native Player कंट्रोलर
+        // 3. हमारा नया Native Player कंट्रोलर (अब असली URL पकड़ेगा!)
         MethodChannel(flutterEngine.dartExecutor.binaryMessenger, PLAYER_CHANNEL).setMethodCallHandler { call, result ->
             if (call.method == "playVideo") {
-                // val url = call.argument<String>("url") // असली वीडियो ID (बाद में यूज़ करेंगे)
+                // 🌟 Flutter (video_player_screen.dart) से भेजा गया असली MP4 लिंक निकालना 🌟
+                val url = call.argument<String>("url")
                 
-                if (activePlayer != null) {
-                    // 🌟 अभी टेस्टिंग के लिए डमी MP4 चला रहे हैं 🌟
-                    val testUrl = "https://storage.googleapis.com/exoplayer-test-media-0/BigBuckBunny_320x180.mp4"
-                    val mediaItem = MediaItem.fromUri(testUrl)
+                if (activePlayer != null && url != null) {
+                    // 🚀 असली YouTube वीडियो स्ट्रीम को ExoPlayer में लोड करना
+                    val mediaItem = MediaItem.fromUri(url)
                     activePlayer?.setMediaItem(mediaItem)
                     activePlayer?.prepare()
                     activePlayer?.play()
-                    result.success("Playing started")
+                    result.success("Playing started natively")
                 } else {
-                    result.error("ERROR", "Player not ready", null)
+                    result.error("ERROR", "Player not ready or URL is null", null)
                 }
             } else {
                 result.notImplemented()
