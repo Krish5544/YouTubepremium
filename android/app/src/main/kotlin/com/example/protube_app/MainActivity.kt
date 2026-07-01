@@ -95,12 +95,20 @@ class NativePlayerView(context: Context) : PlatformView {
     private val playerView: StyledPlayerView = StyledPlayerView(context)
 
     init {
-        // 🌟 MAGIC FIX: YouTube Server Bypass (User-Agent Spoofing) 🌟
-        // यह कोड YouTube को बेवकूफ बनाएगा कि रिक्वेस्ट किसी Android ExoPlayer से नहीं, 
-        // बल्कि एक असली Windows/Chrome ब्राउज़र से आ रही है।
+        // 🌟 THE ULTIMATE BYPASS: Encoder/Encrypted Server Spoofer 🌟
+        // यह YouTube को बेवकूफ बनाएगा कि हम असली वेबसाइट से आये हैं
         val dataSourceFactory = DefaultHttpDataSource.Factory()
             .setUserAgent("Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36")
+            .setAllowCrossProtocolRedirects(true)
+            .setDefaultRequestProperties(
+                mapOf(
+                    "Referer" to "https://www.youtube.com/",
+                    "Origin" to "https://www.youtube.com/",
+                    "Accept" to "*/*"
+                )
+            )
 
+        // नए बाईपास इंजन के साथ प्लेयर को बनाना
         MainActivity.activePlayer = ExoPlayer.Builder(context)
             .setMediaSourceFactory(DefaultMediaSourceFactory(dataSourceFactory))
             .build()
